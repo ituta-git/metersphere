@@ -4,17 +4,26 @@ import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.annotation.JSONType;
 import io.metersphere.api.dto.definition.request.MsTestElement;
 import io.metersphere.api.dto.definition.request.ParameterConfig;
+import io.metersphere.api.dto.definition.request.processors.pre.MsJSR223PreProcessor;
+import io.metersphere.api.dto.scenario.KeyValue;
+import io.metersphere.api.dto.scenario.environment.EnvironmentConfig;
+import io.metersphere.commons.constants.MsTestElementConstants;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.config.ConfigTestElement;
+import org.apache.jmeter.modifiers.UserParameters;
 import org.apache.jmeter.protocol.tcp.sampler.TCPSampler;
 import org.apache.jmeter.save.SaveService;
 import org.apache.jmeter.testelement.TestElement;
+import org.apache.jmeter.testelement.property.CollectionProperty;
+import org.apache.jmeter.testelement.property.StringProperty;
 import org.apache.jorphan.collections.HashTree;
 import org.apache.jorphan.collections.ListedHashTree;
 
-import java.util.List;
+import java.util.*;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -48,19 +57,44 @@ public class MsTCPSampler extends MsTestElement {
     private String password = "";
     @JSONField(ordinal = 33)
     private String request;
-    @JSONField(ordinal = 34)
-    private Object requestResult;
+    //    @JSONField(ordinal = 34)
+//    private Object requestResult;
+    @JSONField(ordinal = 35)
+    private List<KeyValue> parameters;
+    @JSONField(ordinal = 36)
+    private String useEnvironment;
+    @JSONField(ordinal = 37)
+    private MsJSR223PreProcessor tcpPreProcessor;
+    @JSONField(ordinal = 38)
+    private String protocol = "TCP";
+    @JSONField(ordinal = 39)
+    private String projectId;
 
+    @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, ParameterConfig config) {
-        if (!this.isEnable()) {
-            return;
-        }
-        if (this.getReferenced() != null && this.getReferenced().equals("REF")) {
+        if (this.getReferenced() != null && MsTestElementConstants.REF.name().equals(this.getReferenced())) {
             this.getRefElement(this);
         }
+        if (config.getConfig() == null) {
+            // 单独接口执行
+            this.setProjectId(config.getProjectId());
+            config.setConfig(getEnvironmentConfig(useEnvironment));
+        }
+        parseEnvironment(config.getConfig().get(this.projectId));
+
+        // 添加环境中的公共变量
+        Arguments arguments = this.addArguments(config);
+        if (arguments != null) {
+            tree.add(arguments);
+        }
+
         final HashTree samplerHashTree = new ListedHashTree();
         samplerHashTree.add(tcpConfig());
-        tree.set(tcpSampler(), samplerHashTree);
+        tree.set(tcpSampler(config), samplerHashTree);
+        setUserParameters(samplerHashTree);
+        if (tcpPreProcessor != null && StringUtils.isNotBlank(tcpPreProcessor.getScript())) {
+            samplerHashTree.add(tcpPreProcessor.getJSR223PreProcessor());
+        }
         if (CollectionUtils.isNotEmpty(hashTree)) {
             hashTree.forEach(el -> {
                 el.toHashTree(samplerHashTree, el.getHashTree(), config);
@@ -68,9 +102,22 @@ public class MsTCPSampler extends MsTestElement {
         }
     }
 
-    private TCPSampler tcpSampler() {
+    private void parseEnvironment(EnvironmentConfig config) {
+        if (!isCustomizeReq() && config != null && config.getTcpConfig() != null) {
+            this.server = config.getTcpConfig().getServer();
+            this.port = config.getTcpConfig().getPort();
+        }
+    }
+
+    private TCPSampler tcpSampler(ParameterConfig config) {
         TCPSampler tcpSampler = new TCPSampler();
+        tcpSampler.setEnabled(this.isEnable());
         tcpSampler.setName(this.getName());
+        String name = this.getParentName(this.getParent());
+        if (StringUtils.isNotEmpty(name) && !config.isOperating()) {
+            tcpSampler.setName(this.getName() + "<->" + name);
+        }
+
         tcpSampler.setProperty(TestElement.TEST_CLASS, TCPSampler.class.getName());
         tcpSampler.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("TCPSamplerGui"));
         tcpSampler.setClassname(this.getClassname());
@@ -85,8 +132,29 @@ public class MsTCPSampler extends MsTestElement {
         tcpSampler.setRequestData(this.getRequest());
         tcpSampler.setProperty(ConfigTestElement.USERNAME, this.getUsername());
         tcpSampler.setProperty(ConfigTestElement.PASSWORD, this.getPassword());
-
         return tcpSampler;
+    }
+
+    private void setUserParameters(HashTree tree) {
+        UserParameters userParameters = new UserParameters();
+        userParameters.setEnabled(true);
+        userParameters.setName(this.getName() + "UserParameters");
+        userParameters.setPerIteration(false);
+        userParameters.setProperty(TestElement.TEST_CLASS, UserParameters.class.getName());
+        userParameters.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("UserParametersGui"));
+        List<StringProperty> names = new ArrayList<>();
+        List<StringProperty> threadValues = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(this.parameters)) {
+            this.parameters.forEach(item -> {
+                names.add(new StringProperty(new Integer(new Random().nextInt(1000000)).toString(), item.getName()));
+                threadValues.add(new StringProperty(new Integer(new Random().nextInt(1000000)).toString(), item.getValue()));
+            });
+        }
+        userParameters.setNames(new CollectionProperty(UserParameters.NAMES, names));
+        List<CollectionProperty> collectionPropertyList = new ArrayList<>();
+        collectionPropertyList.add(new CollectionProperty(new Integer(new Random().nextInt(1000000)).toString(), threadValues));
+        userParameters.setThreadLists(new CollectionProperty(UserParameters.THREAD_VALUES, collectionPropertyList));
+        tree.add(userParameters);
     }
 
     private ConfigTestElement tcpConfig() {

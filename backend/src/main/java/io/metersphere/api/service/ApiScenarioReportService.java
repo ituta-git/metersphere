@@ -3,7 +3,9 @@ package io.metersphere.api.service;
 import com.alibaba.fastjson.JSON;
 import io.metersphere.api.dto.DeleteAPIReportRequest;
 import io.metersphere.api.dto.QueryAPIReportRequest;
-import io.metersphere.api.dto.automation.*;
+import io.metersphere.api.dto.automation.APIScenarioReportResult;
+import io.metersphere.api.dto.automation.ExecuteType;
+import io.metersphere.api.dto.automation.ScenarioStatus;
 import io.metersphere.api.dto.datacount.ApiDataCountResult;
 import io.metersphere.api.jmeter.ScenarioResult;
 import io.metersphere.api.jmeter.TestResult;
@@ -13,13 +15,18 @@ import io.metersphere.base.mapper.ApiScenarioReportDetailMapper;
 import io.metersphere.base.mapper.ApiScenarioReportMapper;
 import io.metersphere.base.mapper.TestPlanApiScenarioMapper;
 import io.metersphere.base.mapper.ext.ExtApiScenarioReportMapper;
+import io.metersphere.base.mapper.ext.ExtTestPlanScenarioCaseMapper;
 import io.metersphere.commons.constants.ApiRunMode;
+import io.metersphere.commons.constants.ReportTriggerMode;
 import io.metersphere.commons.exception.MSException;
-import io.metersphere.commons.utils.DateUtils;
-import io.metersphere.commons.utils.ServiceUtils;
-import io.metersphere.commons.utils.SessionUtils;
+import io.metersphere.commons.utils.*;
 import io.metersphere.i18n.Translator;
+import io.metersphere.track.service.TestPlanReportService;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,13 +52,18 @@ public class ApiScenarioReportService {
     private ApiScenarioMapper apiScenarioMapper;
     @Resource
     private TestPlanApiScenarioMapper testPlanApiScenarioMapper;
+    @Resource
+    SqlSessionFactory sqlSessionFactory;
 
     public ApiScenarioReport complete(TestResult result, String runMode) {
         // 更新场景
         if (result != null) {
             if (StringUtils.equals(runMode, ApiRunMode.SCENARIO_PLAN.name())) {
                 return updatePlanCase(result);
+            } else if (StringUtils.equals(runMode, ApiRunMode.SCHEDULE_SCENARIO_PLAN.name())) {
+                return updateSchedulePlanCase(result);
             } else {
+                updateScenarioStatus(result.getTestId());
                 return updateScenario(result);
             }
         }
@@ -122,32 +134,134 @@ public class ApiScenarioReportService {
     }
 
     public ApiScenarioReport updatePlanCase(TestResult result) {
-        TestPlanApiScenario testPlanApiScenario = testPlanApiScenarioMapper.selectByPrimaryKey(result.getTestId());
-        ScenarioResult scenarioResult = result.getScenarios().get(0);
-        if (scenarioResult.getError() > 0) {
-            testPlanApiScenario.setLastResult(ScenarioStatus.Fail.name());
-        } else {
-            testPlanApiScenario.setLastResult(ScenarioStatus.Success.name());
-        }
-        String passRate = new DecimalFormat("0%").format((float) scenarioResult.getSuccess() / (scenarioResult.getSuccess() + scenarioResult.getError()));
-        testPlanApiScenario.setPassRate(passRate);
-        // 存储场景报告
-        ApiScenarioReport report = editReport(scenarioResult);
-        // 报告详情内容
-        ApiScenarioReportDetail detail = new ApiScenarioReportDetail();
-        TestResult newResult = createTestResult(result.getTestId(), scenarioResult);
-        List<ScenarioResult> scenarioResults = new ArrayList();
-        scenarioResult.setName(report.getScenarioName());
-        scenarioResults.add(scenarioResult);
-        newResult.setScenarios(scenarioResults);
-        detail.setContent(JSON.toJSONString(newResult).getBytes(StandardCharsets.UTF_8));
-        detail.setReportId(report.getId());
-        detail.setProjectId(report.getProjectId());
-        apiScenarioReportDetailMapper.insert(detail);
+//        TestPlanApiScenario testPlanApiScenario = testPlanApiScenarioMapper.selectByPrimaryKey(result.getTestId());
+        List<ScenarioResult> scenarioResultList = result.getScenarios();
+        ApiScenarioReport returnReport = null;
+        for (ScenarioResult scenarioResult :
+                scenarioResultList) {
+            ApiScenarioReport report = editReport(scenarioResult);
+            // 报告详情内容
+            ApiScenarioReportDetail detail = new ApiScenarioReportDetail();
+            TestResult newResult = createTestResult(result.getTestId(), scenarioResult);
+            scenarioResult.setName(report.getScenarioName());
+            newResult.addScenario(scenarioResult);
 
-        testPlanApiScenario.setReportId(report.getId());
-        testPlanApiScenarioMapper.updateByPrimaryKeySelective(testPlanApiScenario);
-        return report;
+            detail.setContent(JSON.toJSONString(newResult).getBytes(StandardCharsets.UTF_8));
+            detail.setReportId(report.getId());
+            detail.setProjectId(report.getProjectId());
+            apiScenarioReportDetailMapper.insert(detail);
+
+            TestPlanApiScenario testPlanApiScenario = testPlanApiScenarioMapper.selectByPrimaryKey(report.getScenarioId());
+            if(testPlanApiScenario!=null){
+                report.setScenarioId(testPlanApiScenario.getApiScenarioId());
+                apiScenarioReportMapper.updateByPrimaryKeySelective(report);
+                if (scenarioResult.getError() > 0) {
+                    testPlanApiScenario.setLastResult(ScenarioStatus.Fail.name());
+                } else {
+                    testPlanApiScenario.setLastResult(ScenarioStatus.Success.name());
+                }
+                String passRate = new DecimalFormat("0%").format((float) scenarioResult.getSuccess() / (scenarioResult.getSuccess() + scenarioResult.getError()));
+                testPlanApiScenario.setPassRate(passRate);
+                testPlanApiScenario.setReportId(report.getId());
+                testPlanApiScenario.setUpdateTime(System.currentTimeMillis());
+                testPlanApiScenarioMapper.updateByPrimaryKeySelective(testPlanApiScenario);
+            }
+            returnReport = report;
+        }
+
+        return returnReport;
+    }
+
+    public ApiScenarioReport updateSchedulePlanCase(TestResult result) {
+        ApiScenarioReport lastReport = null;
+        List<ScenarioResult> scenarioResultList = result.getScenarios();
+
+        List<String> testPlanReportIdList = new ArrayList<>();
+        for (ScenarioResult scenarioResult : scenarioResultList) {
+            // 存储场景报告
+            ApiScenarioReport report = editReport(scenarioResult);
+
+            /**
+             * 测试计划的定时任务场景执行时，主键是提前生成的【测试报告ID】。也就是TestResult.id是【测试报告ID】。
+             * report.getScenarioId中存放的是 TestPlanApiScenario.id:TestPlanReport.id 由于参数限制，只得将两个ID拼接起来
+             * 拆分report.getScenarioId, 查出ScenarioId，将真正的场景ID赋值回去
+             * 同时将testPlanReportID存入集合，逻辑走完后更新TestPlanReport
+             */
+            String[] idArr = report.getScenarioId().split(":");
+            String planScenarioId = null;
+            if (idArr.length > 1) {
+                planScenarioId = idArr[0];
+                String planReportID = idArr[1];
+                if (!testPlanReportIdList.contains(planReportID)) {
+                    testPlanReportIdList.add(planReportID);
+                }
+            } else {
+                planScenarioId = report.getScenarioId();
+            }
+            TestPlanApiScenario testPlanApiScenario = testPlanApiScenarioMapper.selectByPrimaryKey(planScenarioId);
+            report.setScenarioId(testPlanApiScenario.getApiScenarioId());
+            apiScenarioReportMapper.updateByPrimaryKeySelective(report);
+            if (scenarioResult.getError() > 0) {
+                testPlanApiScenario.setLastResult(ScenarioStatus.Fail.name());
+            } else {
+                testPlanApiScenario.setLastResult(ScenarioStatus.Success.name());
+            }
+            String passRate = new DecimalFormat("0%").format((float) scenarioResult.getSuccess() / (scenarioResult.getSuccess() + scenarioResult.getError()));
+            testPlanApiScenario.setPassRate(passRate);
+            // 报告详情内容
+            ApiScenarioReportDetail detail = new ApiScenarioReportDetail();
+            TestResult newResult = createTestResult(result.getTestId(), scenarioResult);
+            List<ScenarioResult> scenarioResults = new ArrayList();
+            scenarioResult.setName(report.getScenarioName());
+            scenarioResults.add(scenarioResult);
+            newResult.setScenarios(scenarioResults);
+            detail.setContent(JSON.toJSONString(newResult).getBytes(StandardCharsets.UTF_8));
+            detail.setReportId(report.getId());
+            detail.setProjectId(report.getProjectId());
+            apiScenarioReportDetailMapper.insert(detail);
+
+            testPlanApiScenario.setReportId(report.getId());
+            testPlanApiScenario.setUpdateTime(System.currentTimeMillis());
+            testPlanApiScenarioMapper.updateByPrimaryKeySelective(testPlanApiScenario);
+
+            lastReport = report;
+        }
+
+        TestPlanReportService testPlanReportService = CommonBeanFactory.getBean(TestPlanReportService.class);
+        testPlanReportService.updateReport(testPlanReportIdList, ApiRunMode.SCHEDULE_SCENARIO_PLAN.name(), ReportTriggerMode.SCHEDULE.name());
+
+        return lastReport;
+    }
+
+    /**
+     * 批量更新状态，防止重复刷新报告
+     *
+     * @param reportIds
+     */
+    private void updateScenarioStatus(String reportIds) {
+
+        if (StringUtils.isNotEmpty(reportIds)) {
+            List<String> list = new ArrayList<>();
+            try {
+                list = JSON.parseArray(reportIds, String.class);
+            } catch (Exception e) {
+                list.add(reportIds);
+            }
+            ApiScenarioReportExample scenarioReportExample = new ApiScenarioReportExample();
+            scenarioReportExample.createCriteria().andIdIn(list);
+            List<ApiScenarioReport> reportList = apiScenarioReportMapper.selectByExample(scenarioReportExample);
+            SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
+            ApiScenarioReportMapper scenarioReportMapper = sqlSession.getMapper(ApiScenarioReportMapper.class);
+            if (CollectionUtils.isNotEmpty(reportList)) {
+                reportList.forEach(report -> {
+                    report.setUpdateTime(System.currentTimeMillis());
+                    String status = "Success";
+                    report.setStatus(status);
+                    scenarioReportMapper.updateByPrimaryKeySelective(report);
+                });
+                sqlSession.flushStatements();
+            }
+        }
     }
 
     public ApiScenarioReport updateScenario(TestResult result) {
@@ -158,10 +272,8 @@ public class ApiScenarioReportService {
             // 报告详情内容
             ApiScenarioReportDetail detail = new ApiScenarioReportDetail();
             TestResult newResult = createTestResult(result.getTestId(), item);
-            List<ScenarioResult> scenarioResults = new ArrayList();
             item.setName(report.getScenarioName());
-            scenarioResults.add(item);
-            newResult.setScenarios(scenarioResults);
+            newResult.addScenario(item);
             detail.setContent(JSON.toJSONString(newResult).getBytes(StandardCharsets.UTF_8));
             detail.setReportId(report.getId());
             detail.setProjectId(report.getProjectId());
@@ -233,13 +345,41 @@ public class ApiScenarioReportService {
             ids = allIds.stream().filter(id -> !reportRequest.getUnSelectIds().contains(id)).collect(Collectors.toList());
         }
 
-        ApiScenarioReportDetailExample detailExample = new ApiScenarioReportDetailExample();
-        detailExample.createCriteria().andReportIdIn(ids);
-        apiScenarioReportDetailMapper.deleteByExample(detailExample);
+        //为预防数量太多，调用删除方法时引起SQL过长的Bug，此处采取分批执行的方式。
+        //每次处理的数据数量
+        int handleCount = 7000;
+        //每次处理的集合
+        List<String> handleIdList = new ArrayList<>(handleCount);
+        while (ids.size() > handleCount){
+            handleIdList = new ArrayList<>(handleCount);
+            List<String> otherIdList = new ArrayList<>();
+            for (int index = 0;index < ids.size();index++){
+                if(index<handleCount){
+                    handleIdList.add(ids.get(index));
+                }else{
+                    otherIdList.add(ids.get(index));
+                }
+            }
+            //处理本次的数据
+            ApiScenarioReportDetailExample detailExample = new ApiScenarioReportDetailExample();
+            detailExample.createCriteria().andReportIdIn(handleIdList);
+            apiScenarioReportDetailMapper.deleteByExample(detailExample);
+            ApiScenarioReportExample apiTestReportExample = new ApiScenarioReportExample();
+            apiTestReportExample.createCriteria().andIdIn(handleIdList);
+            apiScenarioReportMapper.deleteByExample(apiTestReportExample);
+            //转存剩余的数据
+            ids = otherIdList;
+        }
 
-        ApiScenarioReportExample apiTestReportExample = new ApiScenarioReportExample();
-        apiTestReportExample.createCriteria().andIdIn(ids);
-        apiScenarioReportMapper.deleteByExample(apiTestReportExample);
+        //处理最后剩余的数据
+        if(!ids.isEmpty()){
+            ApiScenarioReportDetailExample detailExample = new ApiScenarioReportDetailExample();
+            detailExample.createCriteria().andReportIdIn(ids);
+            apiScenarioReportDetailMapper.deleteByExample(detailExample);
+            ApiScenarioReportExample apiTestReportExample = new ApiScenarioReportExample();
+            apiTestReportExample.createCriteria().andIdIn(ids);
+            apiScenarioReportMapper.deleteByExample(apiTestReportExample);
+        }
     }
 
     public long countByProjectID(String projectId) {
@@ -274,5 +414,13 @@ public class ApiScenarioReportService {
 
     public List<ApiDataCountResult> countByProjectIdGroupByExecuteResult(String projectId) {
         return extApiScenarioReportMapper.countByProjectIdGroupByExecuteResult(projectId);
+    }
+
+    public List<ApiScenarioReport> selectLastReportByIds(List<String> ids) {
+        if(!ids.isEmpty()){
+            return extApiScenarioReportMapper.selectLastReportByIds(ids);
+        }else {
+            return new ArrayList<>(0);
+        }
     }
 }

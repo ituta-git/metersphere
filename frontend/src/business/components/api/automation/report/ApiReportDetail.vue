@@ -9,14 +9,21 @@
           <main v-if="this.isNotRunning">
             <ms-metric-chart :content="content" :totalTime="totalTime"/>
             <div>
-              <ms-scenario-results :scenarios="content.scenarios" v-on:requestResult="requestResult"/>
+              <!--<ms-scenario-results :scenarios="content.scenarios" v-on:requestResult="requestResult"/>-->
+
+              <el-tabs v-model="activeName" @tab-click="handleClick">
+                <el-tab-pane :label="$t('api_report.total')" name="total">
+                  <ms-scenario-results :scenarios="content.scenarios" v-on:requestResult="requestResult"/>
+                </el-tab-pane>
+                <el-tab-pane name="fail">
+                  <template slot="label">
+                    <span class="fail">{{ $t('api_report.fail') }}</span>
+                  </template>
+                  <ms-scenario-results v-on:requestResult="requestResult" :scenarios="fails"/>
+                </el-tab-pane>
+              </el-tabs>
+
             </div>
-            <!--<el-collapse-transition>-->
-            <!--<div v-show="isActive" style="width: 99%">-->
-            <!--<ms-request-result-tail v-if="isRequestResult" :request-type="requestType" :request="request"-->
-            <!--:scenario-name="scenarioName"/>-->
-            <!--</div>-->
-            <!--</el-collapse-transition>-->
             <ms-api-report-export v-if="reportExportVisible" id="apiTestReport" :title="report.testName"
                                   :content="content" :total-time="totalTime"/>
           </main>
@@ -103,11 +110,15 @@
               if (this.isNotRunning) {
                 try {
                   this.content = JSON.parse(this.report.content);
+                  if (!this.content) {
+                    this.content = {scenarios: []};
+                  }
                   this.$emit('refresh');
                 } catch (e) {
                   throw e;
                 }
                 this.getFails();
+                this.computeTotalTime();
                 this.loading = false;
               } else {
                 setTimeout(this.getReport, 2000)
@@ -123,21 +134,41 @@
         if (this.isNotRunning) {
           this.fails = [];
           this.totalTime = 0
+          if (this.content.scenarios) {
+            this.content.scenarios.forEach((scenario) => {
+              this.totalTime = this.totalTime + Number(scenario.responseTime)
+              let failScenario = Object.assign({}, scenario);
+              if (scenario.error > 0) {
+                this.fails.push(failScenario);
+                failScenario.requestResults = [];
+                scenario.requestResults.forEach((request) => {
+                  if (!request.success) {
+                    let failRequest = Object.assign({}, request);
+                    failScenario.requestResults.push(failRequest);
+                  }
+                })
+              }
+            })
+          }
+        }
+      },
+      computeTotalTime() {
+        if (this.content.scenarios) {
+          let startTime = 99991611737506593;
+          let endTime = 0;
           this.content.scenarios.forEach((scenario) => {
-            this.totalTime = this.totalTime + Number(scenario.responseTime)
-            let failScenario = Object.assign({}, scenario);
-            if (scenario.error > 0) {
-              this.fails.push(failScenario);
-              failScenario.requestResults = [];
-              scenario.requestResults.forEach((request) => {
-                if (!request.success) {
-                  let failRequest = Object.assign({}, request);
-                  failScenario.requestResults.push(failRequest);
-                }
-              })
-
-            }
+            scenario.requestResults.forEach((request) => {
+              if (request.startTime && Number(request.startTime) < startTime) {
+                startTime = request.startTime;
+              }
+              if (request.endTime && Number(request.endTime) > endTime) {
+                endTime = request.endTime;
+              }
+            })
           })
+          if (startTime < endTime) {
+            this.totalTime = endTime - startTime + 100;
+          }
         }
       },
       requestResult(requestResult) {

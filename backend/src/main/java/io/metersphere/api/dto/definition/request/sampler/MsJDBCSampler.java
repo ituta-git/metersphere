@@ -10,6 +10,7 @@ import io.metersphere.api.dto.scenario.KeyValue;
 import io.metersphere.api.dto.scenario.environment.EnvironmentConfig;
 import io.metersphere.api.service.ApiTestEnvironmentService;
 import io.metersphere.base.domain.ApiTestEnvironmentWithBLOBs;
+import io.metersphere.commons.constants.MsTestElementConstants;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.CommonBeanFactory;
 import lombok.Data;
@@ -24,7 +25,6 @@ import org.apache.jmeter.testelement.TestElement;
 import org.apache.jorphan.collections.HashTree;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -46,27 +46,31 @@ public class MsJDBCSampler extends MsTestElement {
     private List<KeyValue> variables;
     @JSONField(ordinal = 26)
     private String environmentId;
-    @JSONField(ordinal = 27)
-    private Object requestResult;
+    //    @JSONField(ordinal = 27)
+//    private Object requestResult;
     @JSONField(ordinal = 28)
     private String dataSourceId;
+    @JSONField(ordinal = 29)
+    private String protocol = "SQL";
 
+    @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, ParameterConfig config) {
-        if (!this.isEnable()) {
-            return;
-        }
-        if (this.getReferenced() != null && this.getReferenced().equals("REF")) {
+        if (this.getReferenced() != null && MsTestElementConstants.REF.name().equals(this.getReferenced())) {
             this.getRefElement(this);
         }
         if (StringUtils.isNotEmpty(dataSourceId)) {
-            initDataSource();
+            this.dataSource = null;
+            this.initDataSource();
         }
         if (this.dataSource == null) {
             MSException.throwException("数据源为空无法执行");
         }
-        final HashTree samplerHashTree = tree.add(jdbcSampler());
+        final HashTree samplerHashTree = tree.add(jdbcSampler(config));
         tree.add(jdbcDataSource());
-        tree.add(arguments(this.getName() + " Variables", this.getVariables()));
+        Arguments arguments = arguments(StringUtils.isNotEmpty(this.getName()) ? this.getName() : "Arguments", this.getVariables());
+        if (arguments != null) {
+            tree.add(arguments);
+        }
         if (CollectionUtils.isNotEmpty(hashTree)) {
             hashTree.forEach(el -> {
                 el.toHashTree(samplerHashTree, el.getHashTree(), config);
@@ -76,35 +80,43 @@ public class MsJDBCSampler extends MsTestElement {
 
     private void initDataSource() {
         ApiTestEnvironmentService environmentService = CommonBeanFactory.getBean(ApiTestEnvironmentService.class);
-        ApiTestEnvironmentWithBLOBs environment = environmentService.get(this.dataSourceId);
+        ApiTestEnvironmentWithBLOBs environment = environmentService.get(environmentId);
         if (environment != null && environment.getConfig() != null) {
-            EnvironmentConfig config = JSONObject.parseObject(environment.getConfig(), EnvironmentConfig.class);
-            if (CollectionUtils.isNotEmpty(config.getDatabaseConfigs())) {
-                List<DatabaseConfig> databaseConfigs = config.getDatabaseConfigs().stream().filter((DatabaseConfig d) -> this.dataSourceId.equals(d.getId())).collect(Collectors.toList());
-                if (CollectionUtils.isNotEmpty(databaseConfigs)) {
-                    this.dataSource = databaseConfigs.get(0);
-                }
+            EnvironmentConfig envConfig = JSONObject.parseObject(environment.getConfig(), EnvironmentConfig.class);
+            if (CollectionUtils.isNotEmpty(envConfig.getDatabaseConfigs())) {
+                envConfig.getDatabaseConfigs().forEach(item -> {
+                    if (item.getId().equals(this.dataSourceId)) {
+                        this.dataSource = item;
+                        return;
+                    }
+                });
             }
         }
     }
 
     private Arguments arguments(String name, List<KeyValue> variables) {
-        Arguments arguments = new Arguments();
-        if (!variables.isEmpty()) {
+        if (CollectionUtils.isNotEmpty(variables)) {
+            Arguments arguments = new Arguments();
             arguments.setEnabled(true);
-            arguments.setName(name);
+            arguments.setName(name + "JDBC_Argument");
             arguments.setProperty(TestElement.TEST_CLASS, Arguments.class.getName());
             arguments.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("ArgumentsPanel"));
             variables.stream().filter(KeyValue::isValid).filter(KeyValue::isEnable).forEach(keyValue ->
                     arguments.addArgument(keyValue.getName(), keyValue.getValue(), "=")
             );
+            return arguments;
         }
-        return arguments;
+        return null;
     }
 
-    private JDBCSampler jdbcSampler() {
+    private JDBCSampler jdbcSampler(ParameterConfig config) {
         JDBCSampler sampler = new JDBCSampler();
+        sampler.setEnabled(this.isEnable());
         sampler.setName(this.getName());
+        String name = this.getParentName(this.getParent());
+        if (StringUtils.isNotEmpty(name) && !config.isOperating()) {
+            sampler.setName(this.getName() + "<->" + name);
+        }
         sampler.setProperty(TestElement.TEST_CLASS, JDBCSampler.class.getName());
         sampler.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("TestBeanGUI"));
         // request.getDataSource() 是ID，需要转换为Name

@@ -41,20 +41,24 @@
 
           </el-form>
         </div>
-        <div v-if="showScript">
-          <div v-for="row in request.hashTree" :key="row.id" v-loading="isReloadData" style="margin-left: 20px;width: 100%">
-            <!-- 前置脚本 -->
-            <ms-jsr233-processor v-if="row.label ==='JSR223 PreProcessor'" @copyRow="copyRow" @remove="remove" :is-read-only="false" :title="$t('api_test.definition.request.pre_script')" style-type="color: #B8741A;background-color: #F9F1EA"
-                                 :jsr223-processor="row"/>
-            <!--后置脚本-->
-            <ms-jsr233-processor v-if="row.label ==='JSR223 PostProcessor'" @copyRow="copyRow" @remove="remove" :is-read-only="false" :title="$t('api_test.definition.request.post_script')" style-type="color: #783887;background-color: #F2ECF3"
-                                 :jsr223-processor="row"/>
-            <!--断言规则-->
-            <ms-api-assertions v-if="row.type==='Assertions'" @copyRow="copyRow" @remove="remove" :is-read-only="isReadOnly" :assertions="row"/>
-            <!--提取规则-->
-            <ms-api-extract :is-read-only="isReadOnly" @copyRow="copyRow" @remove="remove" v-if="row.type==='Extract'" :extract="row"/>
-          </div>
-        </div>
+        <!--<div v-if="showScript">-->
+          <!--<div v-for="row in request.hashTree" :key="row.id" v-loading="isReloadData" style="margin-left: 20px;width: 100%">-->
+            <!--&lt;!&ndash; 前置脚本 &ndash;&gt;-->
+            <!--<ms-jsr233-processor v-if="row.label ==='JSR223 PreProcessor'" @copyRow="copyRow" @remove="remove" :is-read-only="false" :title="$t('api_test.definition.request.pre_script')" style-type="color: #B8741A;background-color: #F9F1EA"-->
+                                 <!--:jsr223-processor="row"/>-->
+            <!--&lt;!&ndash;后置脚本&ndash;&gt;-->
+            <!--<ms-jsr233-processor v-if="row.label ==='JSR223 PostProcessor'" @copyRow="copyRow" @remove="remove" :is-read-only="false" :title="$t('api_test.definition.request.post_script')" style-type="color: #783887;background-color: #F2ECF3"-->
+                                 <!--:jsr223-processor="row"/>-->
+            <!--&lt;!&ndash;断言规则&ndash;&gt;-->
+            <!--<div style="margin-top: 10px">-->
+              <!--<ms-api-assertions v-if="row.type==='Assertions'" @copyRow="copyRow" @remove="remove" :is-read-only="isReadOnly" :assertions="row"/>-->
+            <!--</div>-->
+            <!--&lt;!&ndash;提取规则&ndash;&gt;-->
+            <!--<div style="margin-top: 10px">-->
+              <!--<ms-api-extract :is-read-only="isReadOnly" @copyRow="copyRow" @remove="remove" v-if="row.type==='Extract'" :extract="row"/>-->
+            <!--</div>-->
+          <!--</div>-->
+        <!--</div>-->
       </el-col>
 
       <el-col :span="3" class="ms-left-cell" v-if="showScript">
@@ -76,7 +80,6 @@
   import MsApiAssertions from "../../assertion/ApiAssertions";
   import MsApiExtract from "../../extract/ApiExtract";
   import ApiRequestMethodSelect from "../../collapse/ApiRequestMethodSelect";
-  import MsJsr233Processor from "../../processor/Jsr233Processor";
   import MsCodeEdit from "../../../../../common/components/MsCodeEdit";
   import MsApiScenarioVariables from "../../ApiScenarioVariables";
   import {createComponent} from "../../jmeter/components";
@@ -86,13 +89,15 @@
   import MsDubboConfigCenter from "../../request/dubbo/ConfigCenter";
   import MsDubboConsumerService from "../../request/dubbo/ConsumerAndService";
   import {getUUID} from "@/common/js/utils";
+  import MsJsr233Processor from "../../../../automation/scenario/component/Jsr233Processor";
 
   export default {
     name: "MsDatabaseConfig",
     components: {
+      MsJsr233Processor,
       MsApiScenarioVariables,
       MsCodeEdit,
-      MsJsr233Processor, ApiRequestMethodSelect, MsApiExtract, MsApiAssertions, MsApiKeyValue, MsDubboConsumerService,
+      ApiRequestMethodSelect, MsApiExtract, MsApiAssertions, MsApiKeyValue, MsDubboConsumerService,
       MsDubboConfigCenter,
       MsDubboRegistryCenter,
       MsDubboInterface,

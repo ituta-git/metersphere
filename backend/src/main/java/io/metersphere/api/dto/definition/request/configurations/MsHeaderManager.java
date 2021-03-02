@@ -8,6 +8,7 @@ import io.metersphere.api.dto.scenario.KeyValue;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.protocol.http.control.Header;
 import org.apache.jmeter.protocol.http.control.HeaderManager;
 import org.apache.jmeter.save.SaveService;
@@ -25,13 +26,11 @@ public class MsHeaderManager extends MsTestElement {
     @JSONField(ordinal = 20)
     private List<KeyValue> headers;
 
+    @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, ParameterConfig config) {
-        if (!this.isEnable()) {
-            return;
-        }
         HeaderManager headerManager = new HeaderManager();
-        headerManager.setEnabled(true);
-        headerManager.setName(this.getName() + "Headers");
+        headerManager.setEnabled(this.isEnable());
+        headerManager.setName(StringUtils.isNotEmpty(this.getName()) ? this.getName() : "HeaderManager");
         headerManager.setProperty(TestElement.TEST_CLASS, HeaderManager.class.getName());
         headerManager.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("HeaderPanel"));
         headers.stream().filter(KeyValue::isValid).filter(KeyValue::isEnable).forEach(keyValue ->

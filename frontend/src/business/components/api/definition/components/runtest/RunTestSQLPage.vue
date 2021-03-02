@@ -25,6 +25,8 @@
       <p class="tip">{{$t('api_test.definition.request.res_param')}} </p>
       <ms-request-result-tail :response="responseData" :currentProtocol="currentProtocol" ref="runResult"/>
 
+      <ms-jmx-step :request="api.request" :response="responseData"/>
+
     </el-card>
 
     <!-- 加载用例 -->
@@ -42,29 +44,29 @@
 </template>
 
 <script>
-  import MsApiRequestForm from "../request/http/ApiRequestForm";
-  import {downloadFile, getUUID, getCurrentProjectID} from "@/common/js/utils";
-  import MsApiCaseList from "../case/ApiCaseList";
-  import MsContainer from "../../../../common/components/MsContainer";
-  import MsBottomContainer from "../BottomContainer";
-  import {parseEnvironment} from "../../model/EnvironmentModel";
-  import ApiEnvironmentConfig from "../environment/ApiEnvironmentConfig";
-  import MsRequestResultTail from "../response/RequestResultTail";
-  import MsRun from "../Run";
-  import MsBasisParameters from "../request/database/BasisParameters";
-  import {REQ_METHOD} from "../../model/JsonData";
+import {getUUID} from "@/common/js/utils";
+import MsApiCaseList from "../case/ApiCaseList";
+import MsContainer from "../../../../common/components/MsContainer";
+import MsBottomContainer from "../BottomContainer";
+import {parseEnvironment} from "../../model/EnvironmentModel";
+import ApiEnvironmentConfig from "../environment/ApiEnvironmentConfig";
+import MsRequestResultTail from "../response/RequestResultTail";
+import MsRun from "../Run";
+import MsBasisParameters from "../request/database/BasisParameters";
+import {REQ_METHOD} from "../../model/JsonData";
+import MsJmxStep from "../step/JmxStep";
 
-  export default {
-    name: "RunTestSQLPage",
-    components: {
-      MsApiRequestForm,
-      MsApiCaseList,
-      MsContainer,
-      MsBottomContainer,
-      MsRequestResultTail,
-      ApiEnvironmentConfig,
-      MsRun,
-      MsBasisParameters
+export default {
+  name: "RunTestSQLPage",
+  components: {
+    MsApiCaseList,
+    MsContainer,
+    MsBottomContainer,
+    MsRequestResultTail,
+    ApiEnvironmentConfig,
+    MsRun,
+    MsBasisParameters,
+    MsJmxStep
     },
     data() {
       return {
@@ -87,7 +89,7 @@
         reportId: "",
       }
     },
-    props: {apiData: {}, currentProtocol: String,},
+    props: {apiData: {}, currentProtocol: String,syncTabs: Array, projectId: String},
     methods: {
       handleCommand(e) {
         switch (e) {
@@ -158,19 +160,25 @@
       },
       saveAsApi() {
         let data = {};
-        data.request = JSON.stringify(this.api.request);
+        let req = this.api.request;
+        req.id = getUUID();
+        data.request = JSON.stringify(req);
         data.method = this.api.method;
         data.status = this.api.status;
         data.userId = this.api.userId;
         data.description = this.api.description;
         this.$emit('saveAsApi', data);
+        this.$emit('refresh');
       },
       updateApi() {
         let url = "/api/definition/update";
         let bodyFiles = this.getBodyUploadFiles();
         this.$fileUpload(url, null, bodyFiles, this.api, () => {
           this.$success(this.$t('commons.save_success'));
-          this.$emit('saveApi', this.api);
+          if (this.syncTabs.indexOf(this.api.id) === -1) {
+            this.syncTabs.push(this.api.id);
+          }
+          this.$emit('refresh');
         });
       },
       selectTestCase(item) {
@@ -181,7 +189,7 @@
         }
       },
       getEnvironments() {
-        this.$get('/api/environment/list/' + getCurrentProjectID(), response => {
+        this.$get('/api/environment/list/' + this.projectId, response => {
           this.environments = response.data;
           this.environments.forEach(environment => {
             parseEnvironment(environment);
@@ -201,7 +209,7 @@
         });
       },
       openEnvironmentConfig() {
-        this.$refs.environmentConfig.open(getCurrentProjectID());
+        this.$refs.environmentConfig.open(this.projectId);
       },
       environmentChange(value) {
         for (let i in this.environments) {
@@ -225,7 +233,8 @@
       }
     },
     created() {
-      this.api = this.apiData;
+      // 深度复制
+      this.api = JSON.parse(JSON.stringify(this.apiData));
       this.api.protocol = this.currentProtocol;
       this.currentRequest = this.api.request;
       this.getEnvironments();

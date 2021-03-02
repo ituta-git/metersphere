@@ -1,5 +1,9 @@
 export default {
   commons: {
+    cover: 'Cover',
+    not_cover: 'Not Cover',
+    import_mode: 'Import mode',
+    import_module: 'Import module',
     please_fill_in_the_template: 'Please fill in the template',
     cut_back_old_version: 'Cut back to old version',
     cut_back_new_version: 'Switch back to new version',
@@ -30,7 +34,7 @@ export default {
     operating: 'Operating',
     input_limit: 'Within {0} and {1} characters',
     login: 'Sign In',
-    welcome: 'Welcome back, please enter username and password to log in',
+    welcome: 'One-stop open source continuous testing platform',
     username: 'Username',
     password: 'Password',
     input_username: 'Please enter username',
@@ -69,7 +73,8 @@ export default {
     not_filled: 'Not filled',
     please_select: 'Please select',
     search_by_name: 'Search by name',
-    search_by_name_or_id: 'Search by name or id',
+    search_by_name_or_id: 'Search by ID/NAME',
+    search_by_id_name_tag: 'Search by ID/NAME/TAG',
     personal_information: 'Personal Information',
     exit_system: 'Exit System',
     verification: 'Verification',
@@ -121,12 +126,18 @@ export default {
     required: "{0} is required",
     millisecond: 'ms',
     please_upload: 'Please upload file',
+    please_fill_path: 'Please fill in the path',
     reference_documentation: "Reference documentation",
     already_exists: 'The name already exists',
     modifier: 'Modifier',
     validate: "Validate",
     batch_add: "Batch add",
     check_project_tip: "Create or select the project first",
+    auth_redirect_tip: 'Jump to the authentication source page for authentication',
+    tag_tip: "Enter Enter to Add Label",
+    table: {
+      select_tip: "Item {0} data is selected"
+    },
     date: {
       select_date: 'Select date',
       start_date: 'Start date',
@@ -141,7 +152,8 @@ export default {
       name: "Trigger Mode",
       manual: "Manual trigger",
       schedule: "Scheduled Task",
-      api: "API call"
+      api: "API call",
+      case: "Case"
     },
     adv_search: {
       title: 'Advanced Search',
@@ -174,7 +186,12 @@ export default {
       case: "all",
       review: "all"
     },
-    image: 'Image'
+    image: 'Image',
+    tag: 'Tag',
+    module: {
+      select_module: "Select module",
+      default_module: "Default module",
+    }
   },
   license: {
     title: 'Authorization management',
@@ -195,8 +212,8 @@ export default {
   display: {
     title: 'Theme',
     logo: 'System LOGO',
-    loginLogo: 'Picture on the right side of the login page',
-    loginImage: 'Login page upper left corner LOGO',
+    loginLogo: 'Login page upper left corner LOGO',
+    loginImage: 'Picture on the right side of the login page',
     loginTitle: 'Login page prompt information',
     pageTitle: 'Page Title',
   },
@@ -243,6 +260,8 @@ export default {
       test_review_task_notice: 'Test review task notice',
       defect_task_notification: 'Defect task notification',
       create_new_notification: 'Create a new notification',
+      mail_template_example: 'Mail template',
+      robot_template: 'Robot template',
       select_events: 'Select event',
       select_receiving_method: 'Select receiving method',
       mail: 'mail',
@@ -299,6 +318,7 @@ export default {
     delete_confirm: 'Deleting this project will delete all test resources under this project. Are you sure you want to delete?',
     delete_tip: 'Deleting this project will delete all test resources under this project. Are you sure you want to delete?',
     search_by_name: 'Search by name',
+    search_by_name_jar: 'Search by name/jar',
     input_name: 'Please enter a workspace name',
     owning_workspace: 'Owning Workspace',
     please_choose_workspace: 'Please select Workspace',
@@ -500,6 +520,8 @@ export default {
     },
     definition: {
       api_title: "Api test",
+      case_title: "Test Case",
+      doc_title: "Document",
       api_name: "Api name",
       api_status: "Api status",
       api_type: "Api type",
@@ -510,12 +532,20 @@ export default {
       api_case_status: "Ise case status",
       api_case_passing_rate: "Use case pass rate",
       create_tip: "Note: Detailed interface information can be filled out on the edit page",
+      api_import: "Api Import",
+      check_select: "Please check the API",
       select_comp: {
         no_data: "No Data",
         add_data: "Add Data"
       },
       request: {
         grade_info: "Filter by rank",
+        grade_order_asc: "from low to high by use case level",
+        grade_order_desc: "from high to low by use case level",
+        create_time_order_asc: "by creation time from front to back",
+        create_time_order_desc: "from back to front by creation time",
+        update_time_order_asc: "by update time from front to back",
+        update_time_order_desc: "from back to front by update time",
         run_env: "Operating environment",
         select_case: "Search use cases",
         case: "Case",
@@ -562,7 +592,41 @@ export default {
         create_info: 'Create',
         update_info: 'Update',
         batch_edit: "Batch edit",
+        batch_move: "Batch move",
         path_valid_info: "The request path is invalid",
+        other_config: "Other Config",
+        message_template: "Message Template",
+        tcp_parameter_tip: "The request parameters can be referenced in the request template ${XXX}",
+      },
+      document: {
+        order: "Order",
+        create_time_sort: "From back to front by create time",
+        edit_time_positive_sequence: "From front to back by update time",
+        edit_time_Reverse_order: "From back to front by update time",
+        request_method: "Request method",
+        request_interface: "Request interface",
+        search_by_api_name : "Search by api name",
+        request_info: "Request info",
+        request_head: "Request head",
+        request_param: "Param",
+        request_body: "Request body",
+        example_presentation: "Example presentation",
+        response_info: "Response info",
+        response_head: "Response head",
+        response_body: "Response body",
+        response_code: "Response code",
+        table_coloum:{
+          name: "name",
+          value: "value",
+          is_required: "Is it required",
+          desc: "Description",
+          type: "Type",
+          default_value: "Default value",
+        },
+        data_set: {
+          all: "All",
+          none: "None"
+        },
       }
     },
     automation: {
@@ -570,7 +634,7 @@ export default {
       create_tag: "Create tag",
       scenario_step: "Ccenario step",
       step_total: "Step total",
-      scenario_total: "Scenario total",
+      scenario_total: "Scenario variable",
       api_list_import: "Api list import",
       external_import: "External import",
       wait_controller: "Wait controller",
@@ -581,6 +645,7 @@ export default {
       customize_req: "Customize req",
       reference_info: "Reference info",
       scenario_test: "Scenario test",
+      scenario_list: "Scenario List",
       add_scenario: "Add scenario",
       scenario_name: "Scenario name",
       case_level: "Case level",
@@ -610,7 +675,8 @@ export default {
         select_principal: "Select principal",
         follow_people: "Follow people",
         select_table: "Select table",
-        select_all: "Select all"
+        select_all: "Select all",
+        check_case: "Please check the Scene Use Case"
       },
       report_name_info: 'Please enter the registration name',
       save_case_info: 'Please save the use case first',
@@ -731,6 +797,7 @@ export default {
         json_path_suggest: "JSONPath Assertion Suggest",
         json_path_clear: "Clear JSONPath Assertion",
         debug_first: "First, debug to get the response",
+        suggest_tip: "Click the note to add the JSONPath assertion",
       },
       extract: {
         label: "Extract from response",
@@ -741,6 +808,9 @@ export default {
         regex_expression: "Regular expression",
         json_path_expression: "JSONPath expression",
         xpath_expression: "XPath expression",
+        suggest_tip: "Click the note to add the JSONPath extraction",
+        json_path_suggest: "JSONPath Extraction Suggest",
+        json_path_clear: "Clear JSONPath Extraction",
       },
       processor: {
         pre_exec_script: "PreProcessor",
@@ -810,8 +880,13 @@ export default {
       postman_tip: "Only Postman Collection V2.1 json files are supported",
       postman_export_tip: "Export the test collection by Postman",
       swagger_export_tip: "Export jSON-formatted files via Swagger website",
+      jmeter_export_tip: "Generating JMX file through JMeter",
+      jmeter_tip: "JMX files supporting JMeter 5.2",
       suffixFormatErr: "The file format does not meet the requirements",
       swagger_url_import: "Import using URL",
+      timing_synchronization: "Timing synchronization",
+      next_synchronization_time: "Next synchronization time",
+
     },
     home_page: {
       unit_of_measurement: "",
@@ -899,12 +974,15 @@ export default {
         table_coloum: {
           index: "Index",
           scenario: "Scene",
+          task_type: "Task Type",
           run_rule: "Rule",
           task_status: "Status",
           next_execution_time: "Next Execution Time",
           create_user: "Creator",
           update_time: "Update time",
         },
+        scenario_schedule: "Scenario",
+        test_plan_schedule: "Test plan",
         confirm: {
           close_title: "Do you want to close this scheduled task？",
         }
@@ -961,6 +1039,7 @@ export default {
     test_track: "Track",
     confirm: "Confirm",
     cancel: "Cancel",
+    planning_execution: "Planning&Execution",
     project: "Project",
     save: "Save",
     return: "Return",
@@ -974,6 +1053,7 @@ export default {
     cancel_relevance_success: "Unlinked successfully",
     switch_project: "Switch project",
     case: {
+      check_select: "Please check the case",
       export_all_cases: 'Are you sure you want to export all use cases?',
       input_test_case: 'Please enter the associated case name',
       test_name: 'TestName',
@@ -1022,7 +1102,7 @@ export default {
       batch_operate: 'Batch operation',
       please_select_attr: 'Please select attributes',
       please_select_attr_value: 'Please select the value corresponding to the attribute',
-      batch_edit_case: 'Batch editing test cases',
+      batch_edit_case: 'Batch editing',
       batch_move_case: 'Batch move',
       batch_delete_case: 'Batch delete',
       batch_unlink: 'Batch Unlink',
@@ -1067,6 +1147,7 @@ export default {
       plan_name: "Test plan name",
       plan_project: "Project",
       related_project: "Related Project",
+      related_tip: "After linking the project, you can add test cases under the linking project to the test plan list",
       plan_stage: "Stage",
       plan_status: "Status",
       smoke_test: "Smoke test",
@@ -1084,6 +1165,7 @@ export default {
       plan_status_prepare: "Not started",
       plan_status_running: "Starting",
       plan_status_completed: "Completed",
+      plan_status_trash: "Trashed",
       planned_start_time: "Scheduled Start Time",
       planned_end_time: "Scheduled End Time",
       actual_start_time: "Actual Start Time",
@@ -1091,6 +1173,19 @@ export default {
       plan_delete_confirm: "All use cases under this plan will be deleted,confirm delete test plan: ",
       plan_delete_tip: "The test plan is under way, please confirm and delete it!",
       plan_delete: "Delete test plan",
+      api_case: "Api case",
+      scenario_case: "Scenario case",
+      load_case: {
+        case: "Load Case",
+        execution_status: "Execution status",
+        report: "report",
+        view_report: "View report",
+        unlink_in_bulk: "Unlink in bulk",
+        batch_exec_cases: "Batch execution use cases",
+        exec: "Executing....",
+        error: "Use case execution error, please debug this use case separately!",
+        report_not_found: "Report does not exist",
+      }
     },
     review: {
       test_review: "Test Review",
@@ -1101,6 +1196,8 @@ export default {
       review_project: "Project",
       review_creator: "Creator",
       review_status: "Status",
+      related_project: "Related Project",
+      related_tip: "After the project is associated, you can add test cases under the associated project to the review list",
       end_time: "EndTime",
       delete: "Delete",
       input_review_name: "Please enter the name of the review",
@@ -1227,6 +1324,22 @@ export default {
       tapd_current_owner: "Tapd Current Owner：",
       zentao_bug_build: "Zentao bug Impact version",
       zentao_bug_assigned: "Zentao bug handler",
+    },
+    report: {
+      name: "Test Plan Report",
+      list: {
+        name: "name",
+        test_plan: "Test plan",
+        creator: "Creator",
+        create_time: "Create Time",
+        trigger_mode: "Trigger Mode",
+        status: "Status",
+        operation: "Operation",
+      },
+      trigger_mode: {
+        manual: "Manual",
+        automation: "Automation",
+      },
     }
   },
   test_resource_pool: {
@@ -1246,6 +1359,7 @@ export default {
     status_change_success: 'Successfully changed the status!',
     status_change_failed: 'Failed to change the status, resource pool is invalid!',
     check_in: 'Check in',
+    node_selector_invalid: 'nodeSelector must be JSON'
   },
   system_parameter_setting: {
     mailbox_service_settings: 'Mailbox Settings',
@@ -1425,6 +1539,21 @@ export default {
     interval: "interval",
     proceed: "proceed",
     timeout: "timeout",
+  },
+  variables: {
+    cvs_info: "Only CSV files can be uploaded",
+    end: "end",
+    start: "start",
+    increment: "increment",
+    counter_info: "000 produces at least three digits. user_ 000 in the form of user_ NNN",
+    config: "configure",
+    add_file: "Add file",
+    delimiter: "Delimiter",
+    format: "Output format",
+  },
+  auth_source: {
+    delete_prompt: 'This operation will delete the authentication source, do you want to continue? ',
+    title: 'Auth Source',
+    auth_name_valid: 'Name does not support special characters',
   }
-
 };

@@ -15,6 +15,7 @@ import io.metersphere.track.dto.TestPlanDTOWithMetric;
 import io.metersphere.track.request.testcase.PlanCaseRelevanceRequest;
 import io.metersphere.track.request.testcase.QueryTestPlanRequest;
 import io.metersphere.track.request.testplan.AddTestPlanRequest;
+import io.metersphere.track.request.testplan.TestplanRunRequest;
 import io.metersphere.track.request.testplancase.TestCaseRelevanceRequest;
 import io.metersphere.track.service.TestPlanProjectService;
 import io.metersphere.track.service.TestPlanService;
@@ -50,7 +51,7 @@ public class TestPlanController {
         QueryTestPlanRequest request = new QueryTestPlanRequest();
         request.setWorkspaceId(workspaceId);
         request.setProjectId(projectId);
-        return testPlanService.listTestPlan(request);
+        return testPlanService.listTestPlanByProject(request);
     }
 
     @PostMapping("/list/all")
@@ -66,9 +67,8 @@ public class TestPlanController {
 
     @GetMapping("recent/{count}")
     public List<TestPlan> recentTestPlans(@PathVariable int count) {
-        String currentWorkspaceId = SessionUtils.getCurrentWorkspaceId();
         PageHelper.startPage(1, count, true);
-        return testPlanService.recentTestPlans(currentWorkspaceId);
+        return testPlanService.recentTestPlans();
     }
 
     @PostMapping("/get/{testPlanId}")
@@ -136,5 +136,9 @@ public class TestPlanController {
         request.setProjectIds(projectIds);
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
         return PageUtils.setPageInfo(page, testPlanProjectService.getProjectByPlanId(request));
+    }
+    @PostMapping("/testplan/jenkins")
+    public void  runJenkins(@RequestBody TestplanRunRequest testplanRunRequest){
+        testPlanService.run(testplanRunRequest.getTestPlanID(),testplanRunRequest.getProjectID(),testplanRunRequest.getUserId(),testplanRunRequest.getTriggerMode());
     }
 }

@@ -13,7 +13,6 @@
                  ref="nodeTree"/>
     </template>
 
-<!--    <ms-table-header :condition.sync="condition" @search="search" title="" :show-create="false"/>-->
 
     <el-table
       v-loading="result.loading"
@@ -30,11 +29,6 @@
         :label="$t('commons.name')"
         show-overflow-tooltip>
       </el-table-column>
-<!--      <el-table-column-->
-<!--        prop="userName"-->
-<!--        :label="$t('load_test.user_name')"-->
-<!--        show-overflow-tooltip>-->
-<!--      </el-table-column>-->
       <el-table-column
         prop="status"
         column-key="status"
@@ -226,10 +220,7 @@ export default {
       if (projectId) {
         this.projectId = projectId;
       }
-      this.$refs.nodeTree.result = this.$post("/case/node/list/all/plan",
-        {testPlanId: this.planId, projectId: this.projectId}, response => {
-          this.treeNodes = response.data;
-        });
+      this.treeNodes = [];
       this.selectNodeIds = [];
     }
   }

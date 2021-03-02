@@ -13,8 +13,8 @@ public class TaskInfoResult {
     private int index;
     //任务ID
     private String taskID;
-    //场景名称
-    private String scenario;
+    //任务名称
+    private String name;
     //场景ID
     private String scenarioId;
     //规则
@@ -27,5 +27,7 @@ public class TaskInfoResult {
     private String creator;
     //更新时间
     private Long updateTime;
+    //定时任务类型  情景定时任务/范围计划任务
+    private String taskType;
 
 }

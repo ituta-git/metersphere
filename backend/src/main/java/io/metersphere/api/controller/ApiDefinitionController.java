@@ -8,14 +8,20 @@ import io.metersphere.api.dto.automation.ApiScenarioRequest;
 import io.metersphere.api.dto.automation.ReferenceDTO;
 import io.metersphere.api.dto.definition.*;
 import io.metersphere.api.dto.definition.parse.ApiDefinitionImport;
+import io.metersphere.api.dto.definition.request.ScheduleInfoSwaggerUrlRequest;
+import io.metersphere.api.dto.swaggerurl.SwaggerTaskResult;
+import io.metersphere.api.dto.swaggerurl.SwaggerUrlRequest;
 import io.metersphere.api.service.ApiDefinitionService;
 import io.metersphere.base.domain.ApiDefinition;
+import io.metersphere.base.domain.Schedule;
 import io.metersphere.commons.constants.RoleConstants;
 import io.metersphere.commons.json.JSONSchemaGenerator;
+import io.metersphere.commons.utils.CronUtils;
 import io.metersphere.commons.utils.PageUtils;
 import io.metersphere.commons.utils.Pager;
 import io.metersphere.commons.utils.SessionUtils;
 import io.metersphere.service.CheckPermissionService;
+import io.metersphere.service.ScheduleService;
 import io.metersphere.track.request.testcase.ApiCaseRelevanceRequest;
 import org.apache.shiro.authz.annotation.Logical;
 import org.apache.shiro.authz.annotation.RequiresRoles;
@@ -23,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import java.util.Date;
 import java.util.List;
 
 
@@ -30,6 +37,8 @@ import java.util.List;
 @RequestMapping(value = "/api/definition")
 @RequiresRoles(value = {RoleConstants.TEST_MANAGER, RoleConstants.TEST_USER, RoleConstants.TEST_VIEWER}, logical = Logical.OR)
 public class ApiDefinitionController {
+    @Resource
+    private ScheduleService scheduleService;
     @Resource
     private ApiDefinitionService apiDefinitionService;
     @Resource
@@ -81,7 +90,7 @@ public class ApiDefinitionController {
     }
 
     @PostMapping("/deleteBatchByParams")
-    public void deleteBatchByParams(@RequestBody ApiDefinitionBatchProcessingRequest request) {
+    public void deleteBatchByParams(@RequestBody ApiBatchRequest request) {
         apiDefinitionService.deleteByParams(request);
     }
 
@@ -93,7 +102,7 @@ public class ApiDefinitionController {
 
     @PostMapping("/removeToGcByParams")
     @RequiresRoles(value = {RoleConstants.TEST_MANAGER, RoleConstants.TEST_USER}, logical = Logical.OR)
-    public void removeToGcByParams(@RequestBody ApiDefinitionBatchProcessingRequest request) {
+    public void removeToGcByParams(@RequestBody ApiBatchRequest request) {
         apiDefinitionService.removeToGcByParams(request);
     }
 
@@ -114,6 +123,7 @@ public class ApiDefinitionController {
 
     @PostMapping(value = "/run", consumes = {"multipart/form-data"})
     public String run(@RequestPart("request") RunDefinitionRequest request, @RequestPart(value = "files") List<MultipartFile> bodyFiles) {
+        request.setReportId(null);
         return apiDefinitionService.run(request, bodyFiles);
     }
 
@@ -138,6 +148,53 @@ public class ApiDefinitionController {
         return apiDefinitionService.apiTestImport(file, request);
     }
 
+    @PostMapping(value = "/export")
+    @RequiresRoles(value = {RoleConstants.TEST_USER, RoleConstants.TEST_MANAGER}, logical = Logical.OR)
+    public ApiExportResult export(@RequestBody ApiBatchRequest request) {
+        return apiDefinitionService.export(request);
+    }
+
+    //定时任务创建
+    @PostMapping(value = "/schedule/create")
+    public void createSchedule(@RequestBody Schedule request) {
+        apiDefinitionService.createSchedule(request);
+    }
+    @PostMapping(value = "/schedule/update")
+    public void updateSchedule(@RequestBody Schedule request){
+        apiDefinitionService.updateSchedule(request);
+    }
+    //查找定时任务资源Id
+    @PostMapping(value = "/getResourceId")
+    public String getResourceId(@RequestBody SwaggerUrlRequest swaggerUrlRequest){
+        return apiDefinitionService.getResourceId(swaggerUrlRequest);
+    }
+    //查找定时任务列表
+    @GetMapping("/scheduleTask/{projectId}")
+    public List<SwaggerTaskResult> getSwaggerScheduleList(@PathVariable String projectId) {
+        List<SwaggerTaskResult> resultList = apiDefinitionService.getSwaggerScheduleList(projectId);
+        int dataIndex = 1;
+        for (SwaggerTaskResult swaggerTaskResult :
+                resultList) {
+            swaggerTaskResult.setIndex(dataIndex++);
+            Date nextExecutionTime = CronUtils.getNextTriggerTime(swaggerTaskResult.getRule());
+            if(nextExecutionTime!=null){
+                swaggerTaskResult.setNextExecutionTime(nextExecutionTime.getTime());
+            }
+        }
+        return  resultList;
+    }
+    //更新定时任务
+    @PostMapping(value = "/schedule/updateByPrimyKey")
+    public void updateScheduleEnableByPrimyKey(@RequestBody ScheduleInfoSwaggerUrlRequest request) {
+        Schedule schedule = scheduleService.getSchedule(request.getTaskId());
+        schedule.setEnable(request.getTaskStatus());
+        apiDefinitionService.updateSchedule(schedule);
+    }
+    //删除定时任务和swaggereUrl
+    @PostMapping("/schedule/deleteByPrimyKey")
+    public void deleteSchedule(@RequestBody ScheduleInfoSwaggerUrlRequest request) {
+        apiDefinitionService.deleteSchedule(request);
+    }
     @PostMapping("/getReference")
     public ReferenceDTO getReference(@RequestBody ApiScenarioRequest request) {
         return apiDefinitionService.getReference(request);
@@ -164,5 +221,6 @@ public class ApiDefinitionController {
     public String preview(@RequestBody String jsonSchema) {
         return JSONSchemaGenerator.getJson(jsonSchema);
     }
+
 
 }

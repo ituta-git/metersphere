@@ -2,13 +2,13 @@
   <div id="app" v-loading="loading">
     <el-tabs v-model="activeName" @tab-click="handleClick">
       <el-tab-pane :label="$t('organization.message.template')" name="apiTemplate">
-        <el-button type="primary" size="mini" style="margin-left: 10px" @click="openOneClickOperation">导入</el-button>
-        <div style="min-height: 400px">
+        <el-button type="primary" size="mini" style="margin: 10px 10px 0px" @click="openOneClickOperation">导入</el-button>
+        <div style="min-height: 200px">
           <json-schema-editor class="schema" :value="schema" lang="zh_CN" custom/>
         </div>
       </el-tab-pane>
       <el-tab-pane :label="$t('schema.preview')" name="preview">
-        <div style="min-height: 400px">
+        <div style="min-height: 200px">
           <pre>{{this.preview}}</pre>
         </div>
       </el-tab-pane>
@@ -31,7 +31,7 @@
       body: {},
     },
     created() {
-      if (!this.body.jsonSchema && this.body.raw) {
+      if (!this.body.jsonSchema && this.body.raw && this.checkIsJson(this.body.raw)) {
         let obj = {"root": GenerateSchema(JSON.parse(this.body.raw))}
         this.schema = obj;
       }
@@ -69,6 +69,14 @@
       },
       openOneClickOperation() {
         this.$refs.importJson.openOneClickOperation();
+      },
+      checkIsJson(json) {
+        try {
+          JSON.parse(json);
+          return true;
+        } catch (e) {
+          return false;
+        }
       },
       jsonData(data) {
         let obj = {"root": data}

@@ -5,6 +5,7 @@ import com.github.pagehelper.PageHelper;
 import io.metersphere.api.dto.ApiCaseBatchRequest;
 import io.metersphere.api.dto.definition.*;
 import io.metersphere.api.service.ApiTestCaseService;
+import io.metersphere.base.domain.ApiTestCase;
 import io.metersphere.base.domain.ApiTestCaseWithBLOBs;
 import io.metersphere.commons.constants.RoleConstants;
 import io.metersphere.commons.utils.PageUtils;
@@ -34,6 +35,19 @@ public class ApiTestCaseController {
         return apiTestCaseService.list(request);
     }
 
+    @GetMapping("/findById/{id}")
+    public ApiTestCaseResult single(@PathVariable String id ) {
+        ApiTestCaseRequest request = new ApiTestCaseRequest();
+        request.setWorkspaceId(SessionUtils.getCurrentWorkspaceId());
+        request.setId(id);
+        List<ApiTestCaseResult> list =  apiTestCaseService.list(request);
+        if(!list.isEmpty()){
+            return  list.get(0);
+        }else {
+            return  null;
+        }
+    }
+
     @PostMapping("/list/{goPage}/{pageSize}")
     public Pager<List<ApiTestCaseDTO>> listSimple(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody ApiTestCaseRequest request) {
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
@@ -48,13 +62,13 @@ public class ApiTestCaseController {
     }
 
     @PostMapping(value = "/create", consumes = {"multipart/form-data"})
-    public void create(@RequestPart("request") SaveApiTestCaseRequest request, @RequestPart(value = "files") List<MultipartFile> bodyFiles) {
-        apiTestCaseService.create(request, bodyFiles);
+    public ApiTestCase create(@RequestPart("request") SaveApiTestCaseRequest request, @RequestPart(value = "files") List<MultipartFile> bodyFiles) {
+        return apiTestCaseService.create(request, bodyFiles);
     }
 
     @PostMapping(value = "/update", consumes = {"multipart/form-data"})
-    public void update(@RequestPart("request") SaveApiTestCaseRequest request, @RequestPart(value = "files") List<MultipartFile> bodyFiles) {
-        apiTestCaseService.update(request, bodyFiles);
+    public ApiTestCase update(@RequestPart("request") SaveApiTestCaseRequest request, @RequestPart(value = "files") List<MultipartFile> bodyFiles) {
+        return apiTestCaseService.update(request, bodyFiles);
     }
 
     @GetMapping("/delete/{id}")
@@ -102,5 +116,9 @@ public class ApiTestCaseController {
     @PostMapping(value = "/jenkins/run")
     public String jenkinsRun(@RequestBody RunCaseRequest request) {
         return apiTestCaseService.run(request);
+    }
+    @GetMapping(value = "/jenkins/exec/result/{id}")
+    public String getExecResult(@PathVariable String  id) {
+        return apiTestCaseService.getExecResult(id);
     }
 }

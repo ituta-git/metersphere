@@ -21,6 +21,15 @@ public class ShiroUtils {
         filterChainDefinitionMap.put("/js/**", "anon");
         filterChainDefinitionMap.put("/img/**", "anon");
         filterChainDefinitionMap.put("/fonts/**", "anon");
+        filterChainDefinitionMap.put("/display/info", "anon");
+        filterChainDefinitionMap.put("/favicon.ico", "anon");
+        filterChainDefinitionMap.put("/display/file/**", "anon");
+        filterChainDefinitionMap.put("/jmeter/download/**", "anon");
+        filterChainDefinitionMap.put("/jmeter/ping", "anon");
+        filterChainDefinitionMap.put("/authsource/list/allenable", "anon");
+        filterChainDefinitionMap.put("/sso/signin", "anon");
+        filterChainDefinitionMap.put("/sso/callback", "anon");
+        filterChainDefinitionMap.put("/license/valid", "anon");
 
         // for swagger
         filterChainDefinitionMap.put("/swagger-ui.html", "anon");
@@ -29,6 +38,9 @@ public class ShiroUtils {
 
         filterChainDefinitionMap.put("/403", "anon");
         filterChainDefinitionMap.put("/anonymous/**", "anon");
+
+        //api-对外文档页面提供的查询接口
+        filterChainDefinitionMap.put("/api/document/**", "anon");
     }
 
     public static Cookie getSessionIdCookie(){

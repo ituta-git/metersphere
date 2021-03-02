@@ -76,9 +76,14 @@
           }
         });
       },
-      open() {
+      open(size) {
         this.dialogVisible = true;
-        this.size = this.$parent.selectRows.size;
+        if (size) {
+          this.size = size;
+        } else {
+          // this.size = this.$parent.selectRows.size;
+          this.size = this.$parent.selectDataCounts;
+        }
         listenGoBack(this.handleClose);
       },
       handleClose() {
@@ -90,6 +95,15 @@
         this.$set(this.form, "value", "");
         this.filterable = val === "maintainer" || val === "executor";
         this.options = this.valueArr[val];
+        this.typeArr.forEach(item => {
+          if (item.id === val) {
+            if (item.optionMethod) {
+              this.options = [];
+              item.optionMethod(this.options);
+            }
+            return;
+          }
+        });
       }
     }
   }

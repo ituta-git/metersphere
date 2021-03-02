@@ -7,6 +7,7 @@ import io.metersphere.api.dto.SaveHistoricalDataUpgrade;
 import io.metersphere.api.dto.automation.ScenarioStatus;
 import io.metersphere.api.dto.definition.request.MsScenario;
 import io.metersphere.api.dto.definition.request.MsTestElement;
+import io.metersphere.api.dto.definition.request.assertions.MsAssertionDuration;
 import io.metersphere.api.dto.definition.request.assertions.MsAssertions;
 import io.metersphere.api.dto.definition.request.controller.MsIfController;
 import io.metersphere.api.dto.definition.request.extract.MsExtract;
@@ -18,6 +19,7 @@ import io.metersphere.api.dto.definition.request.sampler.MsJDBCSampler;
 import io.metersphere.api.dto.definition.request.sampler.MsTCPSampler;
 import io.metersphere.api.dto.definition.request.timer.MsConstantTimer;
 import io.metersphere.api.dto.scenario.Body;
+import io.metersphere.api.dto.scenario.KeyValue;
 import io.metersphere.api.dto.scenario.Scenario;
 import io.metersphere.api.dto.scenario.environment.EnvironmentConfig;
 import io.metersphere.api.dto.scenario.request.*;
@@ -27,7 +29,6 @@ import io.metersphere.base.mapper.ApiTestMapper;
 import io.metersphere.base.mapper.ext.ExtApiScenarioMapper;
 import io.metersphere.commons.utils.BeanUtils;
 import io.metersphere.commons.utils.DateUtils;
-import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.commons.utils.SessionUtils;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -38,8 +39,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.io.*;
-import java.net.URL;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.channels.FileChannel;
 import java.util.*;
 
 @Service
@@ -64,15 +67,25 @@ public class HistoricalDataUpgradeService {
         }
     }
 
+    private MsScenario createScenarioByTest(ApiTest test) {
+        MsScenario scenario = new MsScenario();
+        scenario.setName(test.getName());
+        scenario.setReferenced("Upgrade");
+        scenario.setResourceId(UUID.randomUUID().toString());
+        scenario.setId(test.getId());
+        return scenario;
+    }
+
     private MsScenario createScenario(Scenario oldScenario) {
         MsScenario scenario = new MsScenario();
-        scenario.setVariables(oldScenario.getVariables());
+        scenario.setOldVariables(oldScenario.getVariables());
         scenario.setName(oldScenario.getName());
         scenario.setEnableCookieShare(oldScenario.isEnableCookieShare());
         scenario.setEnvironmentId(oldScenario.getEnvironmentId());
         scenario.setReferenced("Upgrade");
         scenario.setId(oldScenario.getId());
         scenario.setResourceId(UUID.randomUUID().toString());
+        scenario.setHeaders(oldScenario.getHeaders());
         LinkedList<MsTestElement> testElements = new LinkedList<>();
         int index = 1;
         for (Request request : oldScenario.getRequests()) {
@@ -85,6 +98,7 @@ public class HistoricalDataUpgradeService {
                 ifController.setType("IfController");
                 ifController.setName("IfController");
                 ifController.setIndex(index + "");
+                ifController.setHashTree(new LinkedList<>());
                 ifController.setResourceId(UUID.randomUUID().toString());
             }
             // 等待控制器
@@ -93,6 +107,7 @@ public class HistoricalDataUpgradeService {
                 BeanUtils.copyBean(constantTimer, request.getTimer());
                 constantTimer.setType("ConstantTimer");
                 constantTimer.setIndex(index + "");
+                constantTimer.setHashTree(new LinkedList<>());
                 constantTimer.setResourceId(UUID.randomUUID().toString());
                 testElements.add(constantTimer);
             }
@@ -101,25 +116,52 @@ public class HistoricalDataUpgradeService {
             if (request instanceof HttpRequest) {
                 element = new MsHTTPSamplerProxy();
                 HttpRequest request1 = (HttpRequest) request;
-                if (StringUtils.isEmpty(request1.getPath()) && StringUtils.isNotEmpty(request1.getUrl())) {
-                    try {
-                        URL urlObject = new URL(request1.getUrl());
-                        String envPath = StringUtils.equals(urlObject.getPath(), "/") ? "" : urlObject.getPath();
-                        request1.setPath(envPath);
-                    } catch (Exception ex) {
-                        LogUtil.error(ex.getMessage());
+                if (request1.getBody() != null) {
+                    request1.getBody().setBinary(new ArrayList<>());
+                    if (request1.getBody().isOldKV()) {
+                        request1.getBody().setType(Body.FORM_DATA);
                     }
-                }
-                if (request1.getBody() != null && request1.getBody().isOldKV()) {
-                    request1.getBody().setType(Body.FORM_DATA);
+                    if ("json".equals(request1.getBody().getFormat())) {
+                        if ("Raw".equals(request1.getBody().getType())) {
+                            request1.getBody().setType(Body.JSON);
+                            if (CollectionUtils.isEmpty(request1.getHeaders())) {
+                                List<KeyValue> headers = new LinkedList<>();
+                                headers.add(new KeyValue("Content-Type", "application/json"));
+                                request1.setHeaders(headers);
+                            } else {
+                                boolean isJsonType = false;
+                                for (KeyValue keyValue : request1.getHeaders()) {
+                                    if ("Content-Type".equals(keyValue.getName())) {
+                                        isJsonType = true;
+                                        break;
+                                    }
+                                }
+                                if (!isJsonType) {
+                                    request1.getHeaders().set(request1.getHeaders().size() - 1, new KeyValue("Content-Type", "application/json"));
+                                }
+                            }
+                        }
+                    }
+                    if ("xml".equals(request1.getBody().getFormat())) {
+                        request1.getBody().setType(Body.XML);
+                    }
                 }
                 BeanUtils.copyBean(element, request1);
                 ((MsHTTPSamplerProxy) element).setProtocol(RequestType.HTTP);
                 ((MsHTTPSamplerProxy) element).setArguments(request1.getParameters());
+                if (StringUtils.isNotEmpty(request1.getPath()) && request1.isUseEnvironment()) {
+                    ((MsHTTPSamplerProxy) element).setPath(request1.getPath());
+                    ((MsHTTPSamplerProxy) element).setUrl(null);
+                } else {
+                    ((MsHTTPSamplerProxy) element).setPath(null);
+                    ((MsHTTPSamplerProxy) element).setUrl(request1.getUrl());
+                }
+                List<KeyValue> keyValues = new LinkedList<>();
+                keyValues.add(new KeyValue("", ""));
+                ((MsHTTPSamplerProxy) element).setRest(keyValues);
                 if (StringUtils.isEmpty(element.getName())) {
                     element.setName(request1.getPath());
                 }
-
                 element.setType("HTTPSamplerProxy");
             }
             if (request instanceof DubboRequest) {
@@ -131,11 +173,15 @@ public class HistoricalDataUpgradeService {
                 element = new MsJDBCSampler();
                 SqlRequest request1 = (SqlRequest) request;
                 BeanUtils.copyBean(element, request1);
+
                 EnvironmentDTO dto = environmentDTOMap.get(request1.getDataSource());
                 if (dto != null) {
                     ((MsJDBCSampler) element).setEnvironmentId(dto.getEnvironmentId());
                     ((MsJDBCSampler) element).setDataSourceId(dto.getDatabaseConfig().getId());
                     ((MsJDBCSampler) element).setDataSource(dto.getDatabaseConfig());
+                }
+                if (CollectionUtils.isEmpty(request1.getVariables())) {
+                    ((MsJDBCSampler) element).setVariables(new ArrayList<>());
                 }
                 element.setType("JDBCSampler");
             }
@@ -147,6 +193,7 @@ public class HistoricalDataUpgradeService {
             }
             element.setIndex(index + "");
             element.setResourceId(UUID.randomUUID().toString());
+            element.setHashTree(new LinkedList<>());
             LinkedList<MsTestElement> msTestElements = new LinkedList<>();
             // 断言规则
             if (request.getAssertions() != null && ((request.getAssertions().getDuration() != null && request.getAssertions().getDuration().getValue() > 0) ||
@@ -154,9 +201,30 @@ public class HistoricalDataUpgradeService {
                     CollectionUtils.isNotEmpty(request.getAssertions().getRegex()) || CollectionUtils.isNotEmpty(request.getAssertions().getXpath2()))) {
                 String assertions = JSON.toJSONString(request.getAssertions());
                 MsAssertions msAssertions = JSON.parseObject(assertions, MsAssertions.class);
+                if (StringUtils.isEmpty(msAssertions.getName())) {
+                    msAssertions.setName("Assertions");
+                }
+                // 给初始值
+                if (msAssertions.getDuration() == null) {
+                    msAssertions.setDuration(new MsAssertionDuration());
+                }
+                if (CollectionUtils.isEmpty(msAssertions.getJsr223())) {
+                    msAssertions.setJsr223(new LinkedList<>());
+                }
+                if (CollectionUtils.isEmpty(msAssertions.getXpath2())) {
+                    msAssertions.setXpath2(new LinkedList<>());
+                }
+                if (CollectionUtils.isEmpty(msAssertions.getJsonPath())) {
+                    msAssertions.setJsonPath(new LinkedList<>());
+                }
+                if (CollectionUtils.isEmpty(msAssertions.getRegex())) {
+                    msAssertions.setRegex(new LinkedList<>());
+                }
+
                 msAssertions.setType("Assertions");
                 msAssertions.setIndex(index + "");
                 msAssertions.setResourceId(UUID.randomUUID().toString());
+                msAssertions.setHashTree(new LinkedList<>());
                 msTestElements.add(msAssertions);
             }
             // 提取规则
@@ -164,8 +232,22 @@ public class HistoricalDataUpgradeService {
                     CollectionUtils.isNotEmpty(request.getExtract().getRegex()) || CollectionUtils.isNotEmpty(request.getExtract().getXpath()))) {
                 String extractJson = JSON.toJSONString(request.getExtract());
                 MsExtract extract = JSON.parseObject(extractJson, MsExtract.class);
+                if (StringUtils.isEmpty(extract.getName())) {
+                    extract.setName("Extract");
+                }
+                // 默认给初始值
+                if (CollectionUtils.isEmpty(extract.getJson())) {
+                    extract.setJson(new LinkedList<>());
+                }
+                if (CollectionUtils.isEmpty(extract.getXpath())) {
+                    extract.setXpath(new LinkedList<>());
+                }
+                if (CollectionUtils.isEmpty(extract.getRegex())) {
+                    extract.setRegex(new LinkedList<>());
+                }
                 extract.setType("Extract");
                 extract.setIndex(index + "");
+                extract.setHashTree(new LinkedList<>());
                 extract.setResourceId(UUID.randomUUID().toString());
                 msTestElements.add(extract);
             }
@@ -173,8 +255,12 @@ public class HistoricalDataUpgradeService {
             if (request.getJsr223PreProcessor() != null && StringUtils.isNotEmpty(request.getJsr223PreProcessor().getScript())) {
                 String preJson = JSON.toJSONString(request.getJsr223PreProcessor());
                 MsJSR223PreProcessor preProcessor = JSON.parseObject(preJson, MsJSR223PreProcessor.class);
+                if (StringUtils.isEmpty(preProcessor.getName())) {
+                    preProcessor.setName("JSR223PreProcessor");
+                }
                 preProcessor.setType("JSR223PreProcessor");
                 preProcessor.setIndex(index + "");
+                preProcessor.setHashTree(new LinkedList<>());
                 preProcessor.setResourceId(UUID.randomUUID().toString());
                 msTestElements.add(preProcessor);
             }
@@ -182,8 +268,12 @@ public class HistoricalDataUpgradeService {
             if (request.getJsr223PostProcessor() != null && StringUtils.isNotEmpty(request.getJsr223PostProcessor().getScript())) {
                 String preJson = JSON.toJSONString(request.getJsr223PostProcessor());
                 MsJSR223PostProcessor preProcessor = JSON.parseObject(preJson, MsJSR223PostProcessor.class);
+                if (StringUtils.isEmpty(preProcessor.getName())) {
+                    preProcessor.setName("JSR223PostProcessor");
+                }
                 preProcessor.setType("JSR223PostProcessor");
                 preProcessor.setIndex(index + "");
+                preProcessor.setHashTree(new LinkedList<>());
                 preProcessor.setResourceId(UUID.randomUUID().toString());
                 msTestElements.add(preProcessor);
             }
@@ -204,9 +294,9 @@ public class HistoricalDataUpgradeService {
         return scenario;
     }
 
-    private ApiScenarioWithBLOBs checkNameExist(Scenario oldScenario, String projectId, ApiScenarioMapper mapper) {
+    private ApiScenarioWithBLOBs getScenario(String oldScenarioId, ApiScenarioMapper mapper) {
         ApiScenarioExample example = new ApiScenarioExample();
-        example.createCriteria().andIdEqualTo(oldScenario.getId());
+        example.createCriteria().andIdEqualTo(oldScenarioId);
         List<ApiScenarioWithBLOBs> list = mapper.selectByExampleWithBLOBs(example);
         if (list.size() > 0) {
             return list.get(0);
@@ -217,45 +307,12 @@ public class HistoricalDataUpgradeService {
     private static final String BODY_FILE_DIR = "/opt/metersphere/data/body";
 
     //文件的拷贝
-    private static void copyFile(String sourcePath, String newPath) {
-        File readfile = new File(sourcePath);
-        File newFile = new File(newPath);
-        BufferedWriter bufferedWriter = null;
-        Writer writer = null;
-        FileOutputStream fileOutputStream = null;
-        BufferedReader bufferedReader = null;
-        try {
-            fileOutputStream = new FileOutputStream(newFile, true);
-            writer = new OutputStreamWriter(fileOutputStream, "UTF-8");
-            bufferedWriter = new BufferedWriter(writer);
-
-            bufferedReader = new BufferedReader(new FileReader(readfile));
-
-            String line = null;
-            while ((line = bufferedReader.readLine()) != null) {
-                bufferedWriter.write(line);
-                bufferedWriter.newLine();
-                bufferedWriter.flush();
-            }
-        } catch (IOException e) {
+    public static void copyFile(String sourcePath, String newPath) {
+        try (FileChannel inChannel = new FileInputStream(new File(sourcePath)).getChannel();
+             FileChannel outChannel = new FileOutputStream(new File(newPath)).getChannel();) {
+            inChannel.transferTo(0, inChannel.size(), outChannel);
+        } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            try {
-                if (bufferedWriter != null) {
-                    bufferedWriter.close();
-                }
-                if (bufferedReader != null) {
-                    bufferedReader.close();
-                }
-                if (writer != null) {
-                    writer.close();
-                }
-                if (fileOutputStream != null) {
-                    fileOutputStream.close();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
     }
 
@@ -286,43 +343,39 @@ public class HistoricalDataUpgradeService {
         copyDir(dir, BODY_FILE_DIR);
     }
 
-    private void createApiScenarioWithBLOBs(SaveHistoricalDataUpgrade saveHistoricalDataUpgrade, Scenario oldScenario, String scenarioDefinition, ApiScenarioMapper mapper) {
-        if (StringUtils.isEmpty(oldScenario.getName())) {
-            oldScenario.setName("默认名称-" + DateUtils.getTimeStr(System.currentTimeMillis()));
-        }
-        ApiScenarioWithBLOBs scenario = checkNameExist(oldScenario, saveHistoricalDataUpgrade.getProjectId(), mapper);
+    private void createApiScenarioWithBLOBs(SaveHistoricalDataUpgrade saveHistoricalDataUpgrade, String id, String name, int total, String scenarioDefinition, ApiScenarioMapper mapper, int num) {
+        ApiScenarioWithBLOBs scenario = getScenario(id, mapper);
         if (scenario != null) {
-            scenario.setName(oldScenario.getName());
+            scenario.setName(name);
             scenario.setProjectId(saveHistoricalDataUpgrade.getProjectId());
             scenario.setTags(scenario.getTags());
             scenario.setLevel("P0");
             scenario.setModulePath(saveHistoricalDataUpgrade.getModulePath());
             scenario.setApiScenarioModuleId(saveHistoricalDataUpgrade.getModuleId());
             scenario.setPrincipal(Objects.requireNonNull(SessionUtils.getUser()).getId());
-            scenario.setStepTotal(oldScenario.getRequests().size());
+            scenario.setStepTotal(total);
             scenario.setScenarioDefinition(scenarioDefinition);
             scenario.setUpdateTime(System.currentTimeMillis());
             scenario.setStatus(ScenarioStatus.Underway.name());
             scenario.setUserId(SessionUtils.getUserId());
-            scenario.setNum(getNextNum(saveHistoricalDataUpgrade.getProjectId()));
             mapper.updateByPrimaryKeySelective(scenario);
         } else {
             scenario = new ApiScenarioWithBLOBs();
-            scenario.setId(oldScenario.getId());
-            scenario.setName(oldScenario.getName());
+            scenario.setId(id);
+            scenario.setName(name);
             scenario.setProjectId(saveHistoricalDataUpgrade.getProjectId());
             scenario.setTags(scenario.getTags());
             scenario.setLevel("P0");
             scenario.setModulePath(saveHistoricalDataUpgrade.getModulePath());
             scenario.setApiScenarioModuleId(saveHistoricalDataUpgrade.getModuleId());
             scenario.setPrincipal(Objects.requireNonNull(SessionUtils.getUser()).getId());
-            scenario.setStepTotal(oldScenario.getRequests().size());
+            scenario.setStepTotal(total);
             scenario.setScenarioDefinition(scenarioDefinition);
             scenario.setCreateTime(System.currentTimeMillis());
             scenario.setUpdateTime(System.currentTimeMillis());
             scenario.setStatus(ScenarioStatus.Underway.name());
             scenario.setUserId(SessionUtils.getUserId());
-            scenario.setNum(getNextNum(saveHistoricalDataUpgrade.getProjectId()));
+            scenario.setNum(num);
             mapper.insert(scenario);
         }
     }
@@ -336,19 +389,40 @@ public class HistoricalDataUpgradeService {
         List<ApiTest> blobs = apiTestMapper.selectByExampleWithBLOBs(example);
         SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
         ApiScenarioMapper mapper = sqlSession.getMapper(ApiScenarioMapper.class);
+        int num = getNextNum(saveHistoricalDataUpgrade.getProjectId());
         for (ApiTest test : blobs) {
             // 附件迁移
             createBodyFiles(test.getId());
-
+            // 把test 生成一个场景，旧场景数据变成引用步骤
+            MsScenario scenarioTest = createScenarioByTest(test);
+            LinkedList<MsTestElement> listSteps = new LinkedList<>();
             List<Scenario> scenarios = JSON.parseArray(test.getScenarioDefinition(), Scenario.class);
             if (CollectionUtils.isNotEmpty(scenarios)) {
                 // 批量处理
                 for (Scenario scenario : scenarios) {
+                    if (StringUtils.isEmpty(scenario.getName())) {
+                        scenario.setName("默认名称-" + DateUtils.getTimeStr(System.currentTimeMillis()));
+                    }
+                    scenario.setId(test.getId() + "=" + scenario.getId());
+                    scenario.setName(test.getName() + "_" + scenario.getName());
                     MsScenario scenario1 = createScenario(scenario);
                     String scenarioDefinition = JSON.toJSONString(scenario1);
-                    createApiScenarioWithBLOBs(saveHistoricalDataUpgrade, scenario, scenarioDefinition, mapper);
+                    num++;
+                    createApiScenarioWithBLOBs(saveHistoricalDataUpgrade, scenario.getId(), scenario.getName(), scenario.getRequests().size(), scenarioDefinition, mapper, num);
+                    MsScenario step = new MsScenario();
+                    step.setId(scenario1.getId());
+                    step.setName(scenario1.getName());
+                    step.setEnable(scenario.isEnable());
+                    step.setType("scenario");
+                    step.setResourceId(UUID.randomUUID().toString());
+                    step.setReferenced("REF");
+                    listSteps.add(step);
                 }
             }
+            num++;
+            scenarioTest.setHashTree(listSteps);
+            String scenarioDefinition = JSON.toJSONString(scenarioTest);
+            createApiScenarioWithBLOBs(saveHistoricalDataUpgrade, scenarioTest.getId(), scenarioTest.getName(), listSteps.size(), scenarioDefinition, mapper, num);
         }
         sqlSession.flushStatements();
         return null;
@@ -359,14 +433,16 @@ public class HistoricalDataUpgradeService {
         environmentDTOMap = new HashMap<>();
         if (CollectionUtils.isNotEmpty(environments)) {
             environments.forEach(environment -> {
-                EnvironmentConfig envConfig = JSONObject.parseObject(environment.getConfig(), EnvironmentConfig.class);
-                if (CollectionUtils.isNotEmpty(envConfig.getDatabaseConfigs())) {
-                    envConfig.getDatabaseConfigs().forEach(item -> {
-                        EnvironmentDTO dto = new EnvironmentDTO();
-                        dto.setDatabaseConfig(item);
-                        dto.setEnvironmentId(environment.getId());
-                        environmentDTOMap.put(item.getId(), dto);
-                    });
+                if (environment != null && environment.getConfig() != null) {
+                    EnvironmentConfig envConfig = JSONObject.parseObject(environment.getConfig(), EnvironmentConfig.class);
+                    if (CollectionUtils.isNotEmpty(envConfig.getDatabaseConfigs())) {
+                        envConfig.getDatabaseConfigs().forEach(item -> {
+                            EnvironmentDTO dto = new EnvironmentDTO();
+                            dto.setDatabaseConfig(item);
+                            dto.setEnvironmentId(environment.getId());
+                            environmentDTOMap.put(item.getId(), dto);
+                        });
+                    }
                 }
             });
         }

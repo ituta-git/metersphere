@@ -30,13 +30,13 @@ public class ApiScenarioTestJob extends   MsScheduleJob {
 
     @Override
     public void execute(JobExecutionContext context) throws JobExecutionException {
+
         JobKey jobKey = context.getTrigger().getJobKey();
         JobDataMap jobDataMap = context.getJobDetail().getJobDataMap();
         String resourceId = jobDataMap.getString("resourceId");
         this.userId = jobDataMap.getString("userId");
         this.expression = jobDataMap.getString("expression");
         this.projectID = jobDataMap.getString("projectId");
-
         if(resourceId!=null){
             scenarioIds = new ArrayList<>();
             scenarioIds.add(resourceId);
@@ -56,7 +56,7 @@ public class ApiScenarioTestJob extends   MsScheduleJob {
         request.setProjectId(projectID);
         request.setTriggerMode(ReportTriggerMode.SCHEDULE.name());
         request.setExecuteType(ExecuteType.Saved.name());
-        request.setScenarioIds(this.scenarioIds);
+        request.setIds(this.scenarioIds);
         request.setReportUserID(this.userId);
 
         apiAutomationService.run(request);

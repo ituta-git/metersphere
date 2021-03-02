@@ -1,21 +1,24 @@
 package io.metersphere.track.service;
 
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import io.metersphere.api.dto.automation.ApiScenarioDTO;
-import io.metersphere.api.dto.automation.ScenarioStatus;
-import io.metersphere.api.dto.automation.TestPlanScenarioRequest;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.metersphere.api.dto.automation.*;
 import io.metersphere.api.dto.definition.ApiTestCaseRequest;
 import io.metersphere.api.dto.definition.TestPlanApiCaseDTO;
+import io.metersphere.api.dto.definition.request.*;
+import io.metersphere.api.dto.definition.request.variable.ScenarioVariable;
+import io.metersphere.api.jmeter.JMeterService;
+import io.metersphere.api.service.ApiAutomationService;
+import io.metersphere.api.service.ApiTestCaseService;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.*;
-import io.metersphere.base.mapper.ext.ExtTestCaseMapper;
-import io.metersphere.base.mapper.ext.ExtTestPlanMapper;
-import io.metersphere.base.mapper.ext.ExtTestPlanTestCaseMapper;
-import io.metersphere.commons.constants.NoticeConstants;
-import io.metersphere.commons.constants.TestPlanStatus;
-import io.metersphere.commons.constants.TestPlanTestCaseStatus;
+import io.metersphere.base.mapper.ext.*;
+import io.metersphere.commons.constants.*;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.user.SessionUser;
 import io.metersphere.commons.utils.*;
@@ -23,22 +26,24 @@ import io.metersphere.dto.BaseSystemConfigDTO;
 import io.metersphere.i18n.Translator;
 import io.metersphere.notice.sender.NoticeModel;
 import io.metersphere.notice.service.NoticeSendService;
+import io.metersphere.performance.service.PerformanceTestService;
+import io.metersphere.service.ScheduleService;
 import io.metersphere.service.SystemParameterService;
 import io.metersphere.track.Factory.ReportComponentFactory;
 import io.metersphere.track.domain.ReportComponent;
-import io.metersphere.track.dto.TestCaseReportMetricDTO;
-import io.metersphere.track.dto.TestPlanCaseDTO;
-import io.metersphere.track.dto.TestPlanDTO;
-import io.metersphere.track.dto.TestPlanDTOWithMetric;
+import io.metersphere.track.dto.*;
 import io.metersphere.track.request.testcase.PlanCaseRelevanceRequest;
 import io.metersphere.track.request.testcase.QueryTestPlanRequest;
 import io.metersphere.track.request.testplan.AddTestPlanRequest;
+import io.metersphere.track.request.testplan.LoadCaseRequest;
+import io.metersphere.track.request.testplan.RunTestPlanRequest;
 import io.metersphere.track.request.testplancase.QueryTestPlanCaseRequest;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.jorphan.collections.HashTree;
+import org.apache.jorphan.collections.ListedHashTree;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,11 +62,15 @@ public class TestPlanService {
     @Resource
     ExtTestPlanMapper extTestPlanMapper;
     @Resource
+    ScheduleService scheduleService;
+    @Resource
     ExtTestPlanTestCaseMapper extTestPlanTestCaseMapper;
     @Resource
     TestCaseMapper testCaseMapper;
     @Resource
     TestPlanTestCaseMapper testPlanTestCaseMapper;
+    @Resource
+    ExtApiScenarioMapper extApiScenarioMapper;
     @Resource
     SqlSessionFactory sqlSessionFactory;
     @Lazy
@@ -87,6 +96,22 @@ public class TestPlanService {
     private TestPlanApiCaseService testPlanApiCaseService;
     @Resource
     private TestPlanScenarioCaseService testPlanScenarioCaseService;
+    @Resource
+    private TestPlanLoadCaseService testPlanLoadCaseService;
+    @Resource
+    private JMeterService jMeterService;
+    @Resource
+    private ApiAutomationService apiAutomationService;
+    @Resource
+    private ExtTestPlanApiCaseMapper extTestPlanApiCaseMapper;
+    @Resource
+    private ExtTestPlanLoadCaseMapper extTestPlanLoadCaseMapper;
+    @Resource
+    private ExtTestPlanScenarioCaseMapper extTestPlanScenarioCaseMapper;
+    @Resource
+    private ApiTestCaseService apiTestCaseService;
+    @Resource
+    private PerformanceTestService performanceTestService;
 
     public synchronized void addTestPlan(AddTestPlanRequest testPlan) {
         if (getTestPlanByName(testPlan.getName()).size() > 0) {
@@ -94,15 +119,6 @@ public class TestPlanService {
         }
 
         String testPlanId = UUID.randomUUID().toString();
-
-        List<String> projectIds = testPlan.getProjectIds();
-        projectIds.forEach(id -> {
-            TestPlanProject testPlanProject = new TestPlanProject();
-            testPlanProject.setProjectId(id);
-            testPlanProject.setTestPlanId(testPlanId);
-            testPlanProjectMapper.insertSelective(testPlanProject);
-        });
-
         testPlan.setId(testPlanId);
         testPlan.setStatus(TestPlanStatus.Prepare.name());
         testPlan.setCreateTime(System.currentTimeMillis());
@@ -131,6 +147,7 @@ public class TestPlanService {
     public List<TestPlan> getTestPlanByName(String name) {
         TestPlanExample example = new TestPlanExample();
         example.createCriteria().andWorkspaceIdEqualTo(SessionUtils.getCurrentWorkspaceId())
+                .andProjectIdEqualTo(SessionUtils.getCurrentProjectId())
                 .andNameEqualTo(name);
         return testPlanMapper.selectByExample(example);
     }
@@ -140,21 +157,33 @@ public class TestPlanService {
     }
 
     public int editTestPlan(TestPlanDTO testPlan) {
-        editTestPlanProject(testPlan);
-        testPlan.setUpdateTime(System.currentTimeMillis());
         checkTestPlanExist(testPlan);
-        //进行中状态，写入实际开始时间
-        if (TestPlanStatus.Underway.name().equals(testPlan.getStatus())) {
-            testPlan.setActualStartTime(System.currentTimeMillis());
-        } else if (TestPlanStatus.Completed.name().equals(testPlan.getStatus())) {
-            //已完成，写入实际完成时间
-            testPlan.setActualEndTime(System.currentTimeMillis());
-
+        TestPlan res = testPlanMapper.selectByPrimaryKey(testPlan.getId()); //  先查一次库
+        if (!res.getStatus().equals(testPlan.getStatus())) {    //  若有改变才更新时间
+            testPlan.setUpdateTime(System.currentTimeMillis());
+            if (TestPlanStatus.Underway.name().equals(testPlan.getStatus())) {
+                if (res.getStatus().equals(TestPlanStatus.Prepare.name())) {
+                    testPlan.setActualStartTime(System.currentTimeMillis());
+                }   //  未开始->进行中，写入实际开始时间
+                else if (res.getStatus().equals(TestPlanStatus.Completed.name())) {
+                    testPlan.setActualEndTime(null);
+                }   //  已完成->进行中，结束时间置空
+            } else if (!res.getStatus().equals(TestPlanStatus.Prepare.name()) &&
+                    TestPlanStatus.Prepare.name().equals(testPlan.getStatus())) {
+                testPlan.setActualStartTime(null);
+                testPlan.setActualEndTime(null);
+            }   //  非未开始->未开始，时间都置空
+            else if (TestPlanStatus.Completed.name().equals(testPlan.getStatus()) &&
+                    !TestPlanStatus.Completed.name().equals(res.getStatus())) {
+                //已完成，写入实际完成时间
+                testPlan.setActualEndTime(System.currentTimeMillis());
+            }
         }
+
         List<String> userIds = new ArrayList<>();
         userIds.add(testPlan.getPrincipal());
         AddTestPlanRequest testPlans = new AddTestPlanRequest();
-        int i = testPlanMapper.updateByPrimaryKeySelective(testPlan);
+        int i = testPlanMapper.updateByPrimaryKeySelective(testPlan); //  更新
         if (!StringUtils.isBlank(testPlan.getStatus())) {
             BeanUtils.copyBean(testPlans, getTestPlan(testPlan.getId()));
             String context = getTestPlanContext(testPlans, NoticeConstants.Event.UPDATE);
@@ -172,69 +201,6 @@ public class TestPlanService {
             noticeSendService.send(NoticeConstants.TaskType.TEST_PLAN_TASK, noticeModel);
         }
         return i;
-    }
-
-    private void editTestPlanProject(TestPlanDTO testPlan) {
-        // 将要进行关联的项目ID
-        List<String> projectIds = testPlan.getProjectIds();
-        // 如果将要关联的项目ID中包含测试计划所属ID则进行剔除
-        if (!CollectionUtils.isEmpty(projectIds)) {
-            if (projectIds.contains(testPlan.getProjectId())) {
-                projectIds.remove(testPlan.getProjectId());
-            }
-        }
-        // todo 优化； TestPlanList intoPlan 方法会触发此更新
-        if (StringUtils.isNotBlank(testPlan.getProjectId())) {
-            TestPlanProjectExample testPlanProjectExample1 = new TestPlanProjectExample();
-            testPlanProjectExample1.createCriteria().andTestPlanIdEqualTo(testPlan.getId());
-            List<TestPlanProject> testPlanProjects = testPlanProjectMapper.selectByExample(testPlanProjectExample1);
-            // 已经关联的项目idList
-            List<String> dbProjectIds = testPlanProjects.stream().map(TestPlanProject::getProjectId).collect(Collectors.toList());
-            // 修改后传过来的项目idList，如果还未关联，进行关联
-            projectIds.forEach(projectId -> {
-                if (!dbProjectIds.contains(projectId)) {
-                    TestPlanProject testPlanProject = new TestPlanProject();
-                    testPlanProject.setTestPlanId(testPlan.getId());
-                    testPlanProject.setProjectId(projectId);
-                    testPlanProjectMapper.insert(testPlanProject);
-                }
-            });
-
-            TestPlanProjectExample testPlanProjectExample = new TestPlanProjectExample();
-            TestPlanProjectExample.Criteria criteria1 = testPlanProjectExample.createCriteria();
-            criteria1.andTestPlanIdEqualTo(testPlan.getId());
-            if (!CollectionUtils.isEmpty(projectIds)) {
-                criteria1.andProjectIdNotIn(projectIds);
-            }
-            testPlanProjectMapper.deleteByExample(testPlanProjectExample);
-
-            // 关联的项目下的用例idList
-            List<String> caseIds = null;
-            // 测试计划所属项目下的用例不解除关联
-            projectIds.add(testPlan.getProjectId());
-            if (!CollectionUtils.isEmpty(projectIds)) {
-                TestCaseExample example = new TestCaseExample();
-                example.createCriteria().andProjectIdIn(projectIds);
-                List<TestCase> caseList = testCaseMapper.selectByExample(example);
-                caseIds = caseList.stream().map(TestCase::getId).collect(Collectors.toList());
-            }
-
-            // 取消关联项目下的用例和计划的关系
-            TestPlanTestCaseExample testPlanTestCaseExample = new TestPlanTestCaseExample();
-            TestPlanTestCaseExample.Criteria criteria = testPlanTestCaseExample.createCriteria().andPlanIdEqualTo(testPlan.getId());
-            if (!CollectionUtils.isEmpty(caseIds)) {
-                criteria.andCaseIdNotIn(caseIds);
-            }
-            testPlanTestCaseMapper.deleteByExample(testPlanTestCaseExample);
-
-            List<String> relevanceProjectIds = new ArrayList<>();
-            relevanceProjectIds.add(testPlan.getProjectId());
-            if (!CollectionUtils.isEmpty(testPlan.getProjectIds())) {
-                relevanceProjectIds.addAll(testPlan.getProjectIds());
-            }
-            testPlanApiCaseService.deleteByRelevanceProjectIds(testPlan.getId(), relevanceProjectIds);
-            testPlanScenarioCaseService.deleteByRelevanceProjectIds(testPlan.getId(), relevanceProjectIds);
-        }
     }
 
     //计划内容
@@ -291,9 +257,12 @@ public class TestPlanService {
     public int deleteTestPlan(String planId) {
         TestPlan testPlan = getTestPlan(planId);
         deleteTestCaseByPlanId(planId);
-        testPlanProjectService.deleteTestPlanProjectByPlanId(planId);
         testPlanApiCaseService.deleteByPlanId(planId);
         testPlanScenarioCaseService.deleteByPlanId(planId);
+
+        //删除定时任务
+        scheduleService.deleteScheduleAndJobByResourceId(planId, ScheduleGroup.TEST_PLAN_TEST.name());
+
         int num = testPlanMapper.deleteByPrimaryKey(planId);
         List<String> relatedUsers = new ArrayList<>();
         AddTestPlanRequest testPlans = new AddTestPlanRequest();
@@ -362,7 +331,17 @@ public class TestPlanService {
                 }
             });
 
-            testPlan.setTotal(apiExecResults.size() + scenarioExecResults.size() + functionalExecResults.size());
+            List<String> loadResults = testPlanLoadCaseService.getStatus(testPlan.getId());
+            loadResults.forEach(item -> {
+                if (StringUtils.isNotBlank(item)) {
+                    testPlan.setTested(testPlan.getTested() + 1);
+                    if (StringUtils.equals(item, "success")) {
+                        testPlan.setPassed(testPlan.getPassed() + 1);
+                    }
+                }
+            });
+
+            testPlan.setTotal(apiExecResults.size() + scenarioExecResults.size() + functionalExecResults.size() + loadResults.size());
 
             testPlan.setPassRate(MathUtils.getPercentWithDecimal(testPlan.getTested() == 0 ? 0 : testPlan.getPassed() * 1.0 / testPlan.getTested()));
             testPlan.setTestRate(MathUtils.getPercentWithDecimal(testPlan.getTotal() == 0 ? 0 : testPlan.getTested() * 1.0 / testPlan.getTotal()));
@@ -380,8 +359,9 @@ public class TestPlanService {
         return testPlans;
     }
 
-    public List<TestPlanDTO> listTestPlanByProject(QueryTestPlanRequest request) {
-        return extTestPlanMapper.planList(request);
+    public List<TestPlanDTOWithMetric> listTestPlanByProject(QueryTestPlanRequest request) {
+        List<TestPlanDTOWithMetric> testPlans = extTestPlanMapper.list(request);
+        return testPlans;
     }
 
     public void testPlanRelevance(PlanCaseRelevanceRequest request) {
@@ -436,26 +416,8 @@ public class TestPlanService {
         }
     }
 
-    public List<TestPlan> recentTestPlans(String currentWorkspaceId) {
-        if (StringUtils.isBlank(currentWorkspaceId)) {
-            return null;
-        }
-        if (StringUtils.isNotBlank(SessionUtils.getCurrentProjectId())) {
-            TestPlanExample testPlanExample = new TestPlanExample();
-            TestPlanExample.Criteria criteria = testPlanExample.createCriteria();
-            criteria.andProjectIdEqualTo(SessionUtils.getCurrentProjectId());
-            List<TestPlan> testPlans = testPlanMapper.selectByExample(testPlanExample);
-            if (!CollectionUtils.isEmpty(testPlans)) {
-                List<String> testPlanIds = testPlans.stream().map(TestPlan::getId).collect(Collectors.toList());
-                TestPlanExample testPlanTestCaseExample = new TestPlanExample();
-                testPlanTestCaseExample.createCriteria().andWorkspaceIdEqualTo(currentWorkspaceId)
-                        .andIdIn(testPlanIds)
-                        .andPrincipalEqualTo(SessionUtils.getUserId());
-                testPlanTestCaseExample.setOrderByClause("update_time desc");
-                return testPlanMapper.selectByExample(testPlanTestCaseExample);
-            }
-        }
-        return new ArrayList<>();
+    public List<TestPlan> recentTestPlans() {
+        return extTestPlanMapper.listRecent(SessionUtils.getUserId(), SessionUtils.getCurrentProjectId());
     }
 
     public List<TestPlan> listTestAllPlan(String currentWorkspaceId) {
@@ -532,18 +494,10 @@ public class TestPlanService {
     }
 
     public void editTestPlanStatus(String planId) {
-        List<String> statusList = extTestPlanTestCaseMapper.getStatusByPlanId(planId);
         TestPlan testPlan = new TestPlan();
         testPlan.setId(planId);
-        for (String status : statusList) {
-            if (StringUtils.equals(status, TestPlanTestCaseStatus.Prepare.name())
-                    || StringUtils.equals(status, TestPlanTestCaseStatus.Underway.name())) {
-                testPlan.setStatus(TestPlanStatus.Underway.name());
-                testPlanMapper.updateByPrimaryKeySelective(testPlan);
-                return;
-            }
-        }
-        testPlan.setStatus(TestPlanStatus.Completed.name());
+        String status = calcTestPlanStatus(planId);
+        testPlan.setStatus(status);
         testPlanMapper.updateByPrimaryKeySelective(testPlan);
         TestPlan testPlans = getTestPlan(planId);
         List<String> userIds = new ArrayList<>();
@@ -570,6 +524,44 @@ public class TestPlanService {
             }
         }
 
+    }
+
+
+    private String calcTestPlanStatus(String planId) {
+        // test-plan-functional-case status
+        List<String> funcStatusList = extTestPlanTestCaseMapper.getStatusByPlanId(planId);
+        for (String funcStatus : funcStatusList) {
+            if (StringUtils.equals(funcStatus, TestPlanTestCaseStatus.Prepare.name())
+                    || StringUtils.equals(funcStatus, TestPlanTestCaseStatus.Underway.name())) {
+                return TestPlanStatus.Underway.name();
+            }
+        }
+
+        // test-plan-api-case status
+        List<String> apiStatusList = extTestPlanApiCaseMapper.getStatusByTestPlanId(planId);
+        for (String apiStatus : apiStatusList) {
+            if (apiStatus == null) {
+                return TestPlanStatus.Underway.name();
+            }
+        }
+
+        // test-plan-scenario-case status
+        List<String> scenarioStatusList = extTestPlanScenarioCaseMapper.getExecResultByPlanId(planId);
+        for (String scenarioStatus : scenarioStatusList) {
+            if (scenarioStatus == null) {
+                return TestPlanStatus.Underway.name();
+            }
+        }
+
+        // test-plan-load-case status
+        List<String> loadStatusList = extTestPlanLoadCaseMapper.getStatusByTestPlanId(planId);
+        for (String loadStatus : loadStatusList) {
+            if (loadStatus == null) {
+                return TestPlanStatus.Underway.name();
+            }
+        }
+
+        return TestPlanStatus.Completed.name();
     }
 
     public String getProjectNameByPlanId(String testPlanId) {
@@ -645,6 +637,7 @@ public class TestPlanService {
         List<Issues> issues = buildFunctionalCaseReport(planId, components);
         buildApiCaseReport(planId, components);
         buildScenarioCaseReport(planId, components);
+        buildLoadCaseReport(planId, components);
 
         TestCaseReportMetricDTO testCaseReportMetricDTO = new TestCaseReportMetricDTO();
         components.forEach(component -> {
@@ -670,6 +663,17 @@ public class TestPlanService {
         request.setPlanId(planId);
         List<ApiScenarioDTO> scenarioDTOS = testPlanScenarioCaseService.list(request);
         for (ApiScenarioDTO item : scenarioDTOS) {
+            for (ReportComponent component : components) {
+                component.readRecord(item);
+            }
+        }
+    }
+
+    public void buildLoadCaseReport(String planId, List<ReportComponent> components) {
+        LoadCaseRequest request = new LoadCaseRequest();
+        request.setTestPlanId(planId);
+        List<TestPlanLoadCaseDTO> loadDTOs = testPlanLoadCaseService.list(request);
+        for (TestPlanLoadCaseDTO item : loadDTOs) {
             for (ReportComponent component : components) {
                 component.readRecord(item);
             }
@@ -703,7 +707,193 @@ public class TestPlanService {
         }
         return issues;
     }
-    public List<TestPlanDTO> selectTestPlanByRelevancy(QueryTestPlanRequest params){
-        return  extTestPlanMapper.selectTestPlanByRelevancy(params);
+
+    public List<TestPlanDTO> selectTestPlanByRelevancy(QueryTestPlanRequest params) {
+        return extTestPlanMapper.selectTestPlanByRelevancy(params);
+    }
+
+    public String findTestProjectNameByTestPlanID(String testPlanId) {
+        return extTestPlanMapper.findTestProjectNameByTestPlanID(testPlanId);
+    }
+
+    public String findScheduleCreateUserById(String testPlanId) {
+        return extTestPlanMapper.findScheduleCreateUserById(testPlanId);
+    }
+
+    /**
+     * 测试计划的定时任务--执行场景案例
+     *
+     * @param request
+     * @return
+     */
+    public String runScenarioCase(SchedulePlanScenarioExecuteRequest request) {
+        MsTestPlan testPlan = new MsTestPlan();
+        testPlan.setHashTree(new LinkedList<>());
+        HashTree jmeterHashTree = new ListedHashTree();
+        Map<String, Map<String, String>> testPlanScenarioIdMap = request.getTestPlanScenarioIDMap();
+        for (Map.Entry<String, Map<String, String>> entry : testPlanScenarioIdMap.entrySet()) {
+            String testPlanID = entry.getKey();
+            Map<String, String> planScenarioIdMap = entry.getValue();
+            List<ApiScenarioWithBLOBs> apiScenarios = extApiScenarioMapper.selectIds(new ArrayList<>(planScenarioIdMap.keySet()));
+            try {
+                boolean isFirst = true;
+                for (ApiScenarioWithBLOBs item : apiScenarios) {
+                    String apiScenarioID = item.getId();
+                    String planScenarioID = planScenarioIdMap.get(apiScenarioID);
+                    if (StringUtils.isEmpty(planScenarioID)) {
+                        continue;
+                    }
+                    if (item.getStepTotal() == 0) {
+                        // 只有一个场景且没有测试步骤，则提示
+                        if (apiScenarios.size() == 1) {
+                            MSException.throwException((item.getName() + "，" + Translator.get("automation_exec_info")));
+                        }
+                        LogUtil.warn(item.getName() + "，" + Translator.get("automation_exec_info"));
+                        continue;
+                    }
+                    MsThreadGroup group = new MsThreadGroup();
+                    group.setLabel(item.getName());
+                    group.setName(UUID.randomUUID().toString());
+                    // 批量执行的结果直接存储为报告
+                    if (isFirst) {
+                        group.setName(request.getId());
+                        isFirst = false;
+                    }
+                    ObjectMapper mapper = new ObjectMapper();
+                    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+                    JSONObject element = JSON.parseObject(item.getScenarioDefinition());
+                    MsScenario scenario = JSONObject.parseObject(item.getScenarioDefinition(), MsScenario.class);
+
+                    // 多态JSON普通转换会丢失内容，需要通过 ObjectMapper 获取
+                    if (element != null && StringUtils.isNotEmpty(element.getString("hashTree"))) {
+                        LinkedList<MsTestElement> elements = mapper.readValue(element.getString("hashTree"),
+                                new TypeReference<LinkedList<MsTestElement>>() {
+                                });
+                        scenario.setHashTree(elements);
+                    }
+                    if (StringUtils.isNotEmpty(element.getString("variables"))) {
+                        LinkedList<ScenarioVariable> variables = mapper.readValue(element.getString("variables"),
+                                new TypeReference<LinkedList<ScenarioVariable>>() {
+                                });
+                        scenario.setVariables(variables);
+                    }
+                    group.setEnableCookieShare(scenario.isEnableCookieShare());
+                    LinkedList<MsTestElement> scenarios = new LinkedList<>();
+                    scenarios.add(scenario);
+                    // 创建场景报告
+                    //不同的运行模式，第二个参数入参不同
+                    apiAutomationService.createScenarioReport(group.getName(),
+                            planScenarioID + ":" + request.getTestPlanReportId(),
+                            item.getName(), request.getTriggerMode() == null ? ReportTriggerMode.MANUAL.name() : request.getTriggerMode(),
+                            request.getExecuteType(), item.getProjectId(), request.getReportUserID());
+                    group.setHashTree(scenarios);
+                    testPlan.getHashTree().add(group);
+
+                }
+            } catch (Exception ex) {
+                MSException.throwException(ex.getMessage());
+            }
+        }
+        testPlan.toHashTree(jmeterHashTree, testPlan.getHashTree(), new ParameterConfig());
+        String runMode = ApiRunMode.SCHEDULE_SCENARIO_PLAN.name();
+        // 调用执行方法
+        jMeterService.runDefinition(request.getId(), jmeterHashTree, request.getReportId(), runMode);
+        return request.getId();
+    }
+
+    public void run(String testPlanID, String projectID, String userId, String triggerMode) {
+        Map<String, String> planScenarioIdMap;
+        Map<String, String> apiTestCaseIdMap;
+        Map<String, String> performanceIdMap;
+
+        planScenarioIdMap = new LinkedHashMap<>();
+        apiTestCaseIdMap = new LinkedHashMap<>();
+        performanceIdMap = new LinkedHashMap<>();
+
+        List<TestPlanApiScenario> testPlanApiScenarioList = testPlanScenarioCaseService.getCasesByPlanId(testPlanID);
+        for (TestPlanApiScenario model : testPlanApiScenarioList) {
+            planScenarioIdMap.put(model.getApiScenarioId(), model.getId());
+        }
+        List<TestPlanApiCase> testPlanApiCaseList = testPlanApiCaseService.getCasesByPlanId(testPlanID);
+        for (TestPlanApiCase model :
+                testPlanApiCaseList) {
+            apiTestCaseIdMap.put(model.getApiCaseId(), model.getId());
+        }
+
+        LoadCaseRequest loadCaseRequest = new LoadCaseRequest();
+        loadCaseRequest.setTestPlanId(testPlanID);
+        loadCaseRequest.setProjectId(projectID);
+        List<TestPlanLoadCaseDTO> testPlanLoadCaseDTOList = testPlanLoadCaseService.list(loadCaseRequest);
+        for (TestPlanLoadCaseDTO dto : testPlanLoadCaseDTOList) {
+            performanceIdMap.put(dto.getId(), dto.getLoadCaseId());
+        }
+
+        LogUtil.info("-------------- start testplan schedule ----------");
+        TestPlanReportService testPlanReportService = CommonBeanFactory.getBean(TestPlanReportService.class);
+        //首先创建testPlanReport，然后返回的ID重新赋值为resourceID，作为后续的参数
+        TestPlanReport testPlanReport = testPlanReportService.genTestPlanReport(testPlanID, userId, triggerMode);
+        //执行接口案例任务
+        for (Map.Entry<String, String> entry : apiTestCaseIdMap.entrySet()) {
+            String apiCaseID = entry.getKey();
+            String planCaseID = entry.getValue();
+            ApiTestCaseWithBLOBs blobs = apiTestCaseService.get(apiCaseID);
+            //需要更新这里来保证PlanCase的状态能正常更改
+            apiTestCaseService.run(blobs, UUID.randomUUID().toString(), testPlanReport.getId(), testPlanID, ApiRunMode.SCHEDULE_API_PLAN.name());
+        }
+
+        //执行场景执行任务
+        if (!planScenarioIdMap.isEmpty()) {
+            LogUtil.info("-------------- testplan schedule ---------- api case over -----------------");
+            SchedulePlanScenarioExecuteRequest scenarioRequest = new SchedulePlanScenarioExecuteRequest();
+            String senarionReportID = UUID.randomUUID().toString();
+            scenarioRequest.setId(senarionReportID);
+            scenarioRequest.setReportId(senarionReportID);
+            scenarioRequest.setProjectId(projectID);
+            scenarioRequest.setTriggerMode(ReportTriggerMode.SCHEDULE.name());
+            scenarioRequest.setExecuteType(ExecuteType.Saved.name());
+            Map<String, Map<String, String>> testPlanScenarioIdMap = new HashMap<>();
+            testPlanScenarioIdMap.put(testPlanID, planScenarioIdMap);
+            scenarioRequest.setTestPlanScenarioIDMap(testPlanScenarioIdMap);
+            scenarioRequest.setReportUserID(userId);
+            scenarioRequest.setTestPlanID(testPlanID);
+            scenarioRequest.setRunMode(ApiRunMode.SCHEDULE_SCENARIO_PLAN.name());
+            scenarioRequest.setTestPlanReportId(testPlanReport.getId());
+            this.runScenarioCase(scenarioRequest);
+            LogUtil.info("-------------- testplan schedule ---------- scenario case over -----------------");
+        }
+        //执行性能测试任务
+        List<String> performaneReportIDList = new ArrayList<>();
+        for (Map.Entry<String, String> entry : performanceIdMap.entrySet()) {
+            String id = entry.getKey();
+            String caseID = entry.getValue();
+            RunTestPlanRequest performanceRequest = new RunTestPlanRequest();
+            performanceRequest.setId(caseID);
+            performanceRequest.setTestPlanLoadId(caseID);
+            performanceRequest.setTriggerMode(ReportTriggerMode.TEST_PLAN_SCHEDULE.name());
+            String reportId = null;
+            try {
+                reportId = performanceTestService.run(performanceRequest);
+                if (reportId != null) {
+                    performaneReportIDList.add(reportId);
+
+                    TestPlanLoadCase testPlanLoadCase = new TestPlanLoadCase();
+                    testPlanLoadCase.setId(performanceRequest.getTestPlanLoadId());
+                    testPlanLoadCase.setLoadReportId(reportId);
+                    testPlanLoadCaseService.update(testPlanLoadCase);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            //更新关联处的报告
+            TestPlanLoadCase loadCase = new TestPlanLoadCaseDTO();
+            loadCase.setId(id);
+            loadCase.setLoadReportId(reportId);
+            testPlanLoadCaseService.update(loadCase);
+        }
+
+        if (!performaneReportIDList.isEmpty()) {
+            //性能测试时保存性能测试报告ID，在结果返回时用于捕捉并进行
+            testPlanReportService.updatePerformanceInfo(testPlanReport, performaneReportIDList, ReportTriggerMode.SCHEDULE.name());
+        }
     }
 }

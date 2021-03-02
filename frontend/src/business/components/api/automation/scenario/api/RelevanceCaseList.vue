@@ -6,16 +6,19 @@
 
       <ms-environment-select :project-id="projectId" v-if="isTestPlan" :is-read-only="isReadOnly" @setEnvironment="setEnvironment"/>
 
-      <el-input placeholder="搜索" @blur="initTable" @keyup.enter.native="initTable" class="search-input" size="small" v-model="condition.name"/>
+      <el-input :placeholder="$t('api_test.definition.request.select_case')" @blur="initTable"
+                @keyup.enter.native="initTable" class="search-input" size="small" v-model="condition.name"/>
 
       <el-table v-loading="result.loading"
                 border
-                :data="tableData" row-key="id" class="test-content adjust-table"
+                :data="tableData"
+                row-key="id"
+                class="test-content adjust-table"
                 @select-all="handleSelectAll"
                 @filter-change="filter"
                 @sort-change="sort"
-                @select="handleSelect">
-        <el-table-column type="selection"/>
+                @select="handleSelect" ref="table">
+        <el-table-column reserve-selection type="selection"/>
 
         <el-table-column prop="name" :label="$t('api_test.definition.api_name')" show-overflow-tooltip/>
 
@@ -55,38 +58,40 @@
                            :total="total"/>
     </api-list-container>
 
+    <table-select-count-bar :count="selectRows.size"/>
+
   </div>
 
 </template>
 
 <script>
 
-  import MsTableOperator from "../../../../common/components/MsTableOperator";
-  import MsTableOperatorButton from "../../../../common/components/MsTableOperatorButton";
-  import {LIST_CHANGE, TrackEvent} from "@/business/components/common/head/ListEvent";
-  import MsTablePagination from "../../../../common/pagination/TablePagination";
-  import MsTag from "../../../../common/components/MsTag";
-  import MsBottomContainer from "../../../definition/components/BottomContainer";
-  import ShowMoreBtn from "../../../../track/case/components/ShowMoreBtn";
-  import MsBatchEdit from "../../../definition/components/basis/BatchEdit";
-  import {API_METHOD_COLOUR, CASE_PRIORITY} from "../../../definition/model/JsonData";
-  import {getCurrentProjectID} from "@/common/js/utils";
-  import ApiListContainer from "../../../definition/components/list/ApiListContainer";
-  import PriorityTableItem from "../../../../track/common/tableItems/planview/PriorityTableItem";
-  import {_filter, _sort} from "../../../../../../common/js/utils";
-  import {_handleSelect, _handleSelectAll} from "../../../../../../common/js/tableUtils";
-  import MsEnvironmentSelect from "../../../definition/components/case/MsEnvironmentSelect";
+import MsTableOperator from "../../../../common/components/MsTableOperator";
+import MsTableOperatorButton from "../../../../common/components/MsTableOperatorButton";
+import MsTablePagination from "../../../../common/pagination/TablePagination";
+import MsTag from "../../../../common/components/MsTag";
+import MsBottomContainer from "../../../definition/components/BottomContainer";
+import ShowMoreBtn from "../../../../track/case/components/ShowMoreBtn";
+import MsBatchEdit from "../../../definition/components/basis/BatchEdit";
+import {API_METHOD_COLOUR, CASE_PRIORITY} from "../../../definition/model/JsonData";
+import {getCurrentProjectID} from "@/common/js/utils";
+import ApiListContainer from "../../../definition/components/list/ApiListContainer";
+import PriorityTableItem from "../../../../track/common/tableItems/planview/PriorityTableItem";
+import MsEnvironmentSelect from "../../../definition/components/case/MsEnvironmentSelect";
+import TableSelectCountBar from "./TableSelectCountBar";
+import {_filter, _handleSelect, _handleSelectAll, _sort} from "@/common/js/tableUtils";
 
-  export default {
-    name: "RelevanceCaseList",
-    components: {
-      MsEnvironmentSelect,
-      PriorityTableItem,
-      ApiListContainer,
-      MsTableOperatorButton,
-      MsTableOperator,
-      MsTablePagination,
-      MsTag,
+export default {
+  name: "RelevanceCaseList",
+  components: {
+    TableSelectCountBar,
+    MsEnvironmentSelect,
+    PriorityTableItem,
+    ApiListContainer,
+    MsTableOperatorButton,
+    MsTableOperator,
+    MsTablePagination,
+    MsTag,
       MsBottomContainer,
       ShowMoreBtn,
       MsBatchEdit
@@ -155,22 +160,17 @@
         this.initTable();
       }
     },
-    computed: {
-
-    },
     methods: {
       isApiListEnableChange(data) {
         this.$emit('isApiListEnableChange', data);
       },
-      initTable() {
-        this.selectRows = new Set();
+      initTable(projectId) {
         this.condition.status = "";
         this.condition.moduleIds = this.selectNodeIds;
-        if (this.projectId != null) {
+        if (projectId != null && typeof projectId === 'string') {
+          this.condition.projectId = projectId;
+        } else if (this.projectId != null) {
           this.condition.projectId = this.projectId;
-        } else {
-          this.condition.projectId = getCurrentProjectID();
-
         }
         if (this.currentProtocol != null) {
           this.condition.protocol = this.currentProtocol;
@@ -231,6 +231,12 @@
       },
       setEnvironment(data) {
         this.environmentId = data.id;
+      },
+      clearSelection() {
+        this.selectRows = new Set();
+        if (this.$refs.table) {
+          this.$refs.table.clearSelection();
+        }
       }
     },
   }

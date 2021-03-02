@@ -18,9 +18,14 @@ import '../common/css/menu-header.css';
 import '../common/css/main.css';
 import CKEditor from '@ckeditor/ckeditor5-vue';
 import VueFab from 'vue-float-action-button'
-import {horizontalDrag} from "../common/js/directive";
+import {left2RightDrag, bottom2TopDrag, right2LeftDrag} from "../common/js/directive";
 import JsonSchemaEditor from './components/common/json-schema/schema/index';
+import JSONPathPicker from 'vue-jsonpath-picker';
+import VueClipboard from 'vue-clipboard2'
+
 Vue.use(JsonSchemaEditor);
+import VuePapaParse from 'vue-papa-parse'
+Vue.use(VuePapaParse)
 
 Vue.config.productionTip = false;
 Vue.use(icon);
@@ -35,6 +40,8 @@ Vue.use(message);
 Vue.use(CKEditor);
 Vue.use(YanProgress);
 Vue.use(VueFab);
+Vue.use(JSONPathPicker);
+Vue.use(VueClipboard)
 
 // v-permission
 Vue.directive('permission', permission);
@@ -47,7 +54,9 @@ Vue.directive('xpack', xpack);
 Vue.directive('tester', tester);
 
 //支持左右拖拽
-Vue.directive('horizontal-drag', horizontalDrag);
+Vue.directive('left-to-right-drag', left2RightDrag);
+Vue.directive('right-to-left-drag', right2LeftDrag);
+Vue.directive('bottom-to-top-drag', bottom2TopDrag);
 
 new Vue({
   el: '#app',

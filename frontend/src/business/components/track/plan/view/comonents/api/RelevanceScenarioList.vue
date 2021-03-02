@@ -17,11 +17,9 @@
           </template>
 
         </el-table-column>
-        <el-table-column prop="tagNames" :label="$t('api_test.automation.tag')" width="200px">
+        <el-table-column prop="tagNames" :label="$t('api_test.automation.tag')" min-width="120">
           <template v-slot:default="scope">
-            <div v-for="itemName in scope.row.tagNames" :key="itemName">
-              <ms-tag type="success" effect="plain" :content="itemName"/>
-            </div>
+              <ms-tag v-for="itemName in scope.row.tags" :key="itemName" type="success" effect="plain" :content="itemName" style="margin-left: 5px"/>
           </template>
         </el-table-column>
         <el-table-column prop="userId" :label="$t('api_test.automation.creator')" show-overflow-tooltip/>
@@ -89,9 +87,6 @@
         selectRows: new Set()
       }
     },
-    created() {
-      this.search();
-    },
     watch: {
       selectNodeIds() {
         this.search();
@@ -102,9 +97,13 @@
     },
     methods: {
       search() {
+        if (!this.projectId) {
+          return;
+        }
         this.selectRows = new Set();
         this.loading = true;
-        this.condition.filters = ["Prepare", "Underway", "Completed"];
+
+        this.condition.filters = {status: ["Prepare", "Underway", "Completed"]};
 
         this.condition.moduleIds = this.selectNodeIds;
 
@@ -121,6 +120,11 @@
           let data = response.data;
           this.total = data.itemCount;
           this.tableData = data.listObject;
+          this.tableData.forEach(item => {
+            if (item.tags && item.tags.length > 0) {
+              item.tags = JSON.parse(item.tags);
+            }
+          });
         });
       },
       handleSelectAll(selection) {

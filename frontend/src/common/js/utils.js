@@ -1,13 +1,13 @@
 import {
   LicenseKey,
+  PROJECT_ID,
   REFRESH_SESSION_USER_URL,
   ROLE_ADMIN,
   ROLE_ORG_ADMIN,
   ROLE_TEST_MANAGER,
   ROLE_TEST_USER,
   ROLE_TEST_VIEWER,
-  TokenKey,
-  PROJECT_ID
+  TokenKey
 } from "./constants";
 import axios from "axios";
 import {jsPDF} from "jspdf";
@@ -138,45 +138,6 @@ export function humpToLine(name) {
   return name.replace(/([A-Z])/g, "_$1").toLowerCase();
 }
 
-//表格数据过滤
-export function _filter(filters, condition) {
-  if (!condition.filters) {
-    condition.filters = {};
-  }
-  for (let filter in filters) {
-    if (filters.hasOwnProperty(filter)) {
-      if (filters[filter] && filters[filter].length > 0) {
-        condition.filters[humpToLine(filter)] = filters[filter];
-      } else {
-        condition.filters[humpToLine(filter)] = null;
-      }
-    }
-  }
-}
-
-//表格数据排序
-export function _sort(column, condition) {
-  column.prop = humpToLine(column.prop);
-  if (column.order === 'descending') {
-    column.order = 'desc';
-  } else {
-    column.order = 'asc';
-  }
-  if (!condition.orders) {
-    condition.orders = [];
-  }
-  let hasProp = false;
-  condition.orders.forEach(order => {
-    if (order.name === column.prop) {
-      order.type = column.order;
-      hasProp = true;
-    }
-  });
-  if (!hasProp) {
-    condition.orders.push({name: column.prop, type: column.order});
-  }
-}
-
 export function downloadFile(name, content) {
   const blob = new Blob([content]);
   if ("download" in document.createElement("a")) {
@@ -303,42 +264,87 @@ export function getBodyUploadFiles(obj, runData) {
   let bodyUploadFiles = [];
   obj.bodyUploadIds = [];
   if (runData) {
-    runData.forEach(request => {
-      if (request.body) {
-        request.body.kvs.forEach(param => {
-          if (param.files) {
-            param.files.forEach(item => {
-              if (item.file) {
-                if (!item.id) {
-                  let fileId = getUUID().substring(0, 12);
-                  item.name = item.file.name;
-                  item.id = fileId;
-                }
-                obj.bodyUploadIds.push(item.id);
-                bodyUploadFiles.push(item.file);
+    if (runData instanceof Array) {
+      runData.forEach(request => {
+        _getBodyUploadFiles(request, bodyUploadFiles, obj);
+      });
+    } else {
+      _getBodyUploadFiles(runData, bodyUploadFiles, obj);
+    }
+  }
+  return bodyUploadFiles;
+}
+
+export function _getBodyUploadFiles(request, bodyUploadFiles, obj) {
+  let body = null;
+  if (request.hashTree && request.hashTree.length > 0 && request.hashTree[0].body) {
+    body = request.hashTree[0].body;
+  } else if (request.body) {
+    body = request.body;
+  }
+  if (body) {
+    if (body.kvs) {
+      body.kvs.forEach(param => {
+        if (param.files) {
+          param.files.forEach(item => {
+            if (item.file) {
+              if (!item.id) {
+                let fileId = getUUID().substring(0, 12);
+                item.name = item.file.name;
+                item.id = fileId;
               }
-            });
-          }
-        });
-        if (request.body.binary) {
-          request.body.binary.forEach(param => {
-            if (param.files) {
-              param.files.forEach(item => {
-                if (item.file) {
-                  if (!item.id) {
-                    let fileId = getUUID().substring(0, 12);
-                    item.name = item.file.name;
-                    item.id = fileId;
-                  }
-                  obj.bodyUploadIds.push(item.id);
-                  bodyUploadFiles.push(item.file);
-                }
-              });
+              obj.bodyUploadIds.push(item.id);
+              bodyUploadFiles.push(item.file);
             }
           });
         }
-      }
-    });
+      });
+    }
+    if (body.binary) {
+      body.binary.forEach(param => {
+        if (param.files) {
+          param.files.forEach(item => {
+            if (item.file) {
+              if (!item.id) {
+                let fileId = getUUID().substring(0, 12);
+                item.name = item.file.name;
+                item.id = fileId;
+              }
+              obj.bodyUploadIds.push(item.id);
+              bodyUploadFiles.push(item.file);
+            }
+          });
+        }
+      });
+    }
   }
-  return bodyUploadFiles;
+}
+
+export function handleCtrlSEvent(event, func) {
+  if (event.keyCode === 83 && event.ctrlKey) {
+    // console.log('拦截到 ctrl + s');//ctrl+s
+    func();
+    event.preventDefault();
+    event.returnValue = false;
+    return false;
+  }
+}
+
+export function strMapToObj(strMap) {
+  if (strMap) {
+    let obj = Object.create(null);
+    for (let [k, v] of strMap) {
+      obj[k] = v;
+    }
+    return obj;
+  }
+  return null;
+}
+
+export function objToStrMap(obj) {
+  let strMap = new Map();
+  for (let k of Object.keys(obj)) {
+    strMap.set(k, obj[k]);
+  }
+  return strMap;
 }

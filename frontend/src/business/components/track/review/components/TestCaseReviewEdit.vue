@@ -21,22 +21,9 @@
               <el-input v-model="form.name"/>
             </el-form-item>
           </el-col>
-
-          <el-col :span="11" :offset="2">
-            <el-form-item :label="$t('test_track.review.review_project')" :label-width="formLabelWidth" prop="projectIds">
-              <el-select
-                v-model="form.projectIds"
-                :placeholder="$t('test_track.review.input_review_project')"
-                multiple
-                style="width: 100%"
-                filterable>
-                <el-option
-                  v-for="item in projects"
-                  :key="item.id"
-                  :label="item.name"
-                  :value="item.id">
-                </el-option>
-              </el-select>
+          <el-col :span="10" :offset="1">
+            <el-form-item :label="$t('commons.tag')" :label-width="formLabelWidth" prop="tag">
+              <ms-input-tag :currentScenario="form" ref="tag"/>
             </el-form-item>
           </el-col>
         </el-row>
@@ -98,6 +85,9 @@
           <el-button type="primary" @click="saveReview">
             {{ $t('test_track.confirm') }}
           </el-button>
+          <el-button type="primary" @click="reviewInfo('form')">
+            {{ $t('test_track.planning_execution') }}
+          </el-button>
         </div>
       </template>
     </el-dialog>
@@ -111,11 +101,12 @@
 
 import TestPlanStatusButton from "../../plan/common/TestPlanStatusButton";
 import {WORKSPACE_ID} from "@/common/js/constants";
-import {listenGoBack, removeGoBackListener} from "@/common/js/utils";
+import {getCurrentProjectID, listenGoBack, removeGoBackListener} from "@/common/js/utils";
+import MsInputTag from "@/business/components/api/automation/scenario/MsInputTag";
 
 export default {
   name: "TestCaseReviewEdit",
-  components: {TestPlanStatusButton},
+  components: {MsInputTag, TestPlanStatusButton},
   data() {
     return {
       dialogFormVisible: false,
@@ -134,7 +125,7 @@ export default {
           {required: true, message: this.$t('test_track.plan.input_plan_name'), trigger: 'blur'},
           {max: 30, message: this.$t('test_track.length_less_than') + '30', trigger: 'blur'}
         ],
-        projectIds: [{required: true, message: this.$t('test_track.plan.input_plan_project'), trigger: 'change'}],
+        // projectIds: [{required: true, message: this.$t('test_track.plan.input_plan_project'), trigger: 'change'}],
         userIds: [{required: true, message: this.$t('test_track.plan.input_plan_principal'), trigger: 'change'}],
         stage: [{required: true, message: this.$t('test_track.plan.input_plan_stage'), trigger: 'change'}],
         description: [{max: 200, message: this.$t('test_track.length_less_than') + '200', trigger: 'blur'}],
@@ -142,14 +133,40 @@ export default {
       },
       formLabelWidth: "120px",
       operationType: '',
-      projects: [],
       reviewerOptions: []
     };
   },
   methods: {
+    reviewInfo(form) {
+      this.$refs['reviewForm'].validate((valid) => {
+        if (valid) {
+          let param = {};
+          Object.assign(param, this.form);
+          param.name = param.name.trim();
+          if (this.form.tags instanceof Array) {
+            this.form.tags = JSON.stringify(this.form.tags);
+          }
+          param.tags = this.form.tags;
+          if (param.name === '') {
+            this.$warning(this.$t('test_track.plan.input_plan_name'));
+            return;
+          }
+
+          if (!this.compareTime(new Date().getTime(), this.form.endTime)) {
+            return false;
+          }
+
+          this.result = this.$post('/test/case/review/' + this.operationType, param, response => {
+            this.dialogFormVisible = false;
+            this.$router.push('/track/review/view/' + response.data);
+          });
+        } else {
+          return false;
+        }
+      });
+    },
     openCaseReviewEditDialog(caseReview) {
       this.resetForm();
-      this.getProjects();
       this.setReviewerOptions();
       this.operationType = 'save';
       if (caseReview) {
@@ -169,6 +186,10 @@ export default {
           let param = {};
           Object.assign(param, this.form);
           param.name = param.name.trim();
+          if (this.form.tags instanceof Array) {
+            this.form.tags = JSON.stringify(this.form.tags);
+          }
+          param.tags = this.form.tags;
           if (param.name === '') {
             this.$warning(this.$t('test_track.plan.input_plan_name'));
             return;
@@ -178,49 +199,14 @@ export default {
             return false;
           }
 
-          if (this.operationType === 'edit') {
-            const nowIds = param.projectIds;
-            let sign = true;
-            this.dbProjectIds.forEach(dbId => {
-              if (nowIds.indexOf(dbId) === -1 && sign) {
-                sign = false;
-                this.$confirm(this.$t('test_track.case.cancel_relevance_project'), this.$t('commons.prompt'), {
-                  confirmButtonText: this.$t('commons.confirm'),
-                  cancelButtonText: this.$t('commons.cancel'),
-                  type: 'warning'
-                }).then(() => {
-                  this.editTestReview(param);
-                }).catch(() => {
-                  this.$info(this.$t('commons.cancel'))
-                });
-              }
-            });
-            if (sign) {
-              this.editTestReview(param);
-            }
-          } else {
-            this.editTestReview(param);
-          }
-
+          this.result = this.$post('/test/case/review/' + this.operationType, param, () => {
+            this.$success(this.$t('commons.save_success'));
+            this.dialogFormVisible = false;
+            this.$emit("refresh");
+          });
 
         } else {
           return false;
-        }
-      });
-    },
-    editTestReview(param) {
-      this.result = this.$post('/test/case/review/' + this.operationType, param, () => {
-        this.$success(this.$t('commons.save_success'));
-        this.dialogFormVisible = false;
-        this.$emit("refresh");
-      });
-    },
-    getProjects() {
-      this.result = this.$get("/project/listAll", (response) => {
-        if (response.success) {
-          this.projects = response.data;
-        } else {
-          this.$warning()(response.message);
         }
       });
     },

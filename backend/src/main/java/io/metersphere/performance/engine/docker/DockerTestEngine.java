@@ -6,7 +6,7 @@ import io.metersphere.base.domain.TestResource;
 import io.metersphere.commons.constants.ResourceStatusEnum;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.CommonBeanFactory;
-import io.metersphere.config.JmeterProperties;
+import io.metersphere.commons.utils.UrlTestUtils;
 import io.metersphere.config.KafkaProperties;
 import io.metersphere.controller.ResultHolder;
 import io.metersphere.dto.BaseSystemConfigDTO;
@@ -15,6 +15,7 @@ import io.metersphere.i18n.Translator;
 import io.metersphere.performance.engine.AbstractEngine;
 import io.metersphere.performance.engine.request.StartTestRequest;
 import io.metersphere.service.SystemParameterService;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
@@ -71,10 +72,15 @@ public class DockerTestEngine extends AbstractEngine {
 
         BaseSystemConfigDTO baseInfo = CommonBeanFactory.getBean(SystemParameterService.class).getBaseInfo();
         KafkaProperties kafkaProperties = CommonBeanFactory.getBean(KafkaProperties.class);
-        JmeterProperties jmeterProperties = CommonBeanFactory.getBean(JmeterProperties.class);
-        String metersphereUrl = "http://localhost:8081";
+        String metersphereUrl = "http://localhost:8081"; // 占位符
         if (baseInfo != null) {
             metersphereUrl = baseInfo.getUrl();
+        }
+        String jmeterPingUrl = metersphereUrl + "/jmeter/ping"; // 检查下载地址是否正确
+        // docker 不能从 localhost 中下载文件
+        if (StringUtils.contains(metersphereUrl, "http://localhost")
+                || !UrlTestUtils.testUrlWithTimeOut(jmeterPingUrl, 1000)) {
+            MSException.throwException(Translator.get("run_load_test_file_init_error"));
         }
 
         Map<String, String> env = new HashMap<>();
@@ -87,8 +93,9 @@ public class DockerTestEngine extends AbstractEngine {
         env.put("BOOTSTRAP_SERVERS", kafkaProperties.getBootstrapServers());
         env.put("LOG_TOPIC", kafkaProperties.getLog().getTopic());
         env.put("RESOURCE_ID", resource.getId());
-        env.put("THREAD_NUM", "" + threadNum);
-        env.put("HEAP", jmeterProperties.getHeap());
+        env.put("THREAD_NUM", "0");// 传入0表示不用修改线程数
+        env.put("HEAP", HEAP);
+        env.put("GC_ALGO", GC_ALGO);
 
 
         StartTestRequest startTestRequest = new StartTestRequest();
@@ -123,4 +130,5 @@ public class DockerTestEngine extends AbstractEngine {
             }
         });
     }
+
 }

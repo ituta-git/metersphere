@@ -1,19 +1,17 @@
 package io.metersphere.api.dto.automation;
 
+import io.metersphere.base.domain.ApiScenarioWithBLOBs;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.Map;
 
 @Setter
 @Getter
-public class RunScenarioRequest {
-
-    private String id;
+public class RunScenarioRequest extends ApiScenarioWithBLOBs {
 
     private String reportId;
-
-    private String projectId;
 
     private String environmentId;
 
@@ -23,28 +21,17 @@ public class RunScenarioRequest {
 
     private String runMode;
 
+    //测试情景和测试计划的关联ID
+    private String planScenarioId;
+
     private List<String> planCaseIds;
+
+    private List<String> ids;
 
     private String reportUserID;
 
-    private List<String> scenarioIds;
+    private Map<String,String> scenarioTestPlanIdMap;
 
-    /**
-     * isSelectAllDate：选择的数据是否是全部数据（全部数据是不受分页影响的数据）
-     * filters: 数据状态
-     * name：如果是全部数据，那么表格如果历经查询，查询参数是什么
-     * moduleIds： 哪些模块的数据
-     * unSelectIds：是否在页面上有未勾选的数据，有的话他们的ID是哪些。
-     * filters/name/moduleIds/unSeelctIds 只在isSelectAllDate为true时需要。为了让程序能明确批量的范围。
-     */
-    private boolean isSelectAllDate;
-
-    private List<String> filters;
-
-    private String name;
-
-    private List<String> moduleIds;
-
-    private List<String> unSelectIds;
+    private ApiScenarioRequest condition;
 
 }

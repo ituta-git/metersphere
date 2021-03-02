@@ -27,13 +27,10 @@ public class MsJSR223PostProcessor extends MsTestElement {
     @JSONField(ordinal = 21)
     private String scriptLanguage;
 
-
+    @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, ParameterConfig config) {
-        if (!this.isEnable()) {
-            return;
-        }
         JSR223PostProcessor processor = new JSR223PostProcessor();
-        processor.setEnabled(true);
+        processor.setEnabled(this.isEnable());
         if (StringUtils.isNotEmpty(this.getName())) {
             processor.setName(this.getName());
         } else {

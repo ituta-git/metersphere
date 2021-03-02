@@ -11,6 +11,7 @@
       @edit="edit"
       @drag="drag"
       @remove="remove"
+      @refresh="list"
       @nodeSelectEvent="nodeChange"
       ref="nodeTree">
 
@@ -33,26 +34,26 @@
 </template>
 
 <script>
-  import MsAddBasisApi from "../basis/AddBasisApi";
-  import SelectMenu from "../../../../track/common/SelectMenu";
-  import {OPTIONS} from "../../model/JsonData";
-  import ApiImport from "../import/ApiImport";
-  import {getCurrentProjectID} from "@/common/js/utils";
-  import MsNodeTree from "../../../../track/common/NodeTree";
-  import ApiModuleHeader from "./ApiModuleHeader";
-  import {buildNodePath} from "../../model/NodeTree";
+import MsAddBasisApi from "../basis/AddBasisApi";
+import SelectMenu from "../../../../track/common/SelectMenu";
+import {OPTIONS} from "../../model/JsonData";
+import ApiImport from "../import/ApiImport";
+import {getCurrentProjectID} from "@/common/js/utils";
+import MsNodeTree from "../../../../track/common/NodeTree";
+import ApiModuleHeader from "./ApiModuleHeader";
+import {buildNodePath} from "../../model/NodeTree";
 
-  export default {
-    name: 'MsApiModule',
-    components: {
-      ApiModuleHeader,
-      MsNodeTree,
-      MsAddBasisApi,
-      SelectMenu,
-      ApiImport
-    },
-    data() {
-      return {
+export default {
+  name: 'MsApiModule',
+  components: {
+    ApiModuleHeader,
+    MsNodeTree,
+    MsAddBasisApi,
+    SelectMenu,
+    ApiImport
+  },
+  data() {
+    return {
         result: {},
         condition: {
           protocol: OPTIONS[0].value,
@@ -72,7 +73,7 @@
         }
       },
       planId: String,
-      relevanceProjectId: String
+      relevanceProjectId: String,
     },
     computed: {
       isPlanModel() {
@@ -106,14 +107,14 @@
       }
     },
     methods: {
-      list() {
+      list(projectId) {
         let url = undefined;
         if (this.isPlanModel) {
           url = '/api/module/list/plan/' + this.planId + '/' + this.condition.protocol;
         } else if (this.isRelevanceModel) {
           url = "/api/module/list/" + this.relevanceProjectId + "/" + this.condition.protocol;
         } else {
-          url = "/api/module/list/" + this.projectId + "/" + this.condition.protocol;
+          url = "/api/module/list/" + (projectId ? projectId : this.projectId) + "/" + this.condition.protocol;
           if (!this.projectId) {
             return;
           }
@@ -126,6 +127,10 @@
               buildNodePath(node, {path: ''}, moduleOptions);
             });
             this.$emit('setModuleOptions', moduleOptions);
+            this.$emit('setNodeTree', this.data);
+            if (this.$refs.nodeTree) {
+              this.$refs.nodeTree.filter(this.condition.filterText);
+            }
           }
         });
       },
@@ -177,10 +182,10 @@
         }
       },
       //创建根目录的模块---供父类使用
-      createRootModel(){
+      createRootModel() {
         let dataArr = this.$refs.nodeTree.extendTreeNodes;
-        if(dataArr.length>0){
-          this.$refs.nodeTree.append({},dataArr[0]);
+        if (dataArr.length > 0) {
+          this.$refs.nodeTree.append({}, dataArr[0]);
         }
       },
       exportAPI() {
@@ -194,7 +199,7 @@
       },
       refresh() {
         this.list();
-        this.$emit("refreshTable");
+        this.$emit('refreshTable');
       },
     }
   }

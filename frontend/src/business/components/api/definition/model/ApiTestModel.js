@@ -1,5 +1,6 @@
 import {
   Arguments,
+  ConstantTimer as JMXConstantTimer,
   CookieManager,
   DNSCacheManager,
   DubboSample,
@@ -10,6 +11,7 @@ import {
   HTTPSamplerArguments,
   HTTPsamplerFiles,
   HTTPSamplerProxy,
+  IfController as JMXIfController,
   JDBCDataSource,
   JDBCSampler,
   JSONPathAssertion,
@@ -20,12 +22,11 @@ import {
   ResponseCodeAssertion,
   ResponseDataAssertion,
   ResponseHeadersAssertion,
+  TCPSampler,
   TestElement,
   TestPlan,
   ThreadGroup,
   XPath2Extractor,
-  IfController as JMXIfController,
-  ConstantTimer as JMXConstantTimer, TCPSampler,
 } from "./JMX";
 import Mock from "mockjs";
 import {funcFilters} from "@/common/js/func-filter";
@@ -596,9 +597,11 @@ export class TCPRequest extends Request {
     super(RequestFactory.TYPES.TCP, options);
     this.useEnvironment = options.useEnvironment;
     this.debugReport = undefined;
+    this.parameters = [];
 
     //设置TCPConfig的属性
     this.set(new TCPConfig(options));
+    this.sets({parameters: KeyValue}, options);
 
     this.request = options.request;
   }
@@ -805,12 +808,12 @@ export class AssertionJSR223 extends AssertionType {
 
     this.name = undefined;
     this.script = undefined;
-    this.language = "beanshell";
+    this.scriptLanguage = "beanshell";
     this.set(options);
   }
 
   isValid() {
-    return !!this.script && !!this.language;
+    return !!this.script && !!this.scriptLanguage;
   }
 }
 
@@ -1022,9 +1025,9 @@ export class LoopController extends Controller {
     this.type = "LoopController";
     this.active = false;
     this.loopType = "LOOP_COUNT";
-    this.countController = {loops: 0, interval: 0, proceed: false};
-    this.forEachController = {inputVal: "", returnVal: "", interval: 0};
-    this.whileController = {variable: "", operator: "", value: "", timeout: 0};
+    this.countController = {loops: 0, interval: 0, proceed: true, requestResult: {}};
+    this.forEachController = {inputVal: "", returnVal: "", interval: 0, requestResult: {}};
+    this.whileController = {variable: "", operator: "", value: "", timeout: 0, requestResult: {}};
     this.hashTree = [];
     this.set(options);
   }

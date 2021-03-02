@@ -12,9 +12,11 @@ import io.metersphere.api.dto.definition.request.sampler.dubbo.MsConfigCenter;
 import io.metersphere.api.dto.definition.request.sampler.dubbo.MsConsumerAndService;
 import io.metersphere.api.dto.definition.request.sampler.dubbo.MsRegistryCenter;
 import io.metersphere.api.dto.scenario.KeyValue;
+import io.metersphere.commons.constants.MsTestElementConstants;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.ConfigTestElement;
 import org.apache.jmeter.save.SaveService;
 import org.apache.jmeter.testelement.TestElement;
@@ -31,7 +33,7 @@ public class MsDubboSampler extends MsTestElement {
     private String type = "DubboSampler";
 
     @JSONField(ordinal = 52)
-    private String protocol = "DUBBO";
+    private final String protocol = "dubbo://";
     @JsonProperty(value = "interface")
     @JSONField(ordinal = 53, name = "interface")
     private String _interface;
@@ -50,21 +52,19 @@ public class MsDubboSampler extends MsTestElement {
     @JSONField(ordinal = 59)
     private List<KeyValue> attachmentArgs;
 
-    @JSONField(ordinal = 60)
-    private Object requestResult;
+//    @JSONField(ordinal = 60)
+//    private Object requestResult;
 
+    @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, ParameterConfig config) {
-        if (!this.isEnable()) {
+        if (this.getReferenced() != null && "Deleted".equals(this.getReferenced())) {
             return;
         }
-        if (this.getReferenced() != null && this.getReferenced().equals("Deleted")) {
-            return;
-        }
-        if (this.getReferenced() != null && this.getReferenced().equals("REF")) {
+        if (this.getReferenced() != null && MsTestElementConstants.REF.name().equals(this.getReferenced())) {
             this.getRefElement(this);
         }
 
-        final HashTree testPlanTree = tree.add(dubboSample());
+        final HashTree testPlanTree = tree.add(dubboSample(config));
         if (CollectionUtils.isNotEmpty(hashTree)) {
             hashTree.forEach(el -> {
                 el.toHashTree(testPlanTree, el.getHashTree(), config);
@@ -72,9 +72,14 @@ public class MsDubboSampler extends MsTestElement {
         }
     }
 
-    private DubboSample dubboSample() {
+    private DubboSample dubboSample(ParameterConfig config) {
         DubboSample sampler = new DubboSample();
+        sampler.setEnabled(this.isEnable());
         sampler.setName(this.getName());
+        String name = this.getParentName(this.getParent());
+        if (StringUtils.isNotEmpty(name) && !config.isOperating()) {
+            sampler.setName(this.getName() + "<->" + name);
+        }
         sampler.setProperty(TestElement.TEST_CLASS, DubboSample.class.getName());
         sampler.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("DubboSampleGui"));
 
@@ -86,28 +91,17 @@ public class MsDubboSampler extends MsTestElement {
         Constants.setInterfaceName(this.get_interface(), sampler);
         Constants.setMethod(this.getMethod(), sampler);
 
-        List<MethodArgument> methodArgs = this.getArgs().stream().filter(KeyValue::isValid).filter(KeyValue::isEnable)
-                .map(keyValue -> new MethodArgument(keyValue.getName(), keyValue.getValue())).collect(Collectors.toList());
-        Constants.setMethodArgs(methodArgs, sampler);
-
-        List<MethodArgument> attachmentArgs = this.getAttachmentArgs().stream().filter(KeyValue::isValid).filter(KeyValue::isEnable)
-                .map(keyValue -> new MethodArgument(keyValue.getName(), keyValue.getValue())).collect(Collectors.toList());
-        Constants.setAttachmentArgs(attachmentArgs, sampler);
-
+        if (CollectionUtils.isNotEmpty(this.getArgs())) {
+            List<MethodArgument> methodArgs = this.getArgs().stream().filter(KeyValue::isValid).filter(KeyValue::isEnable)
+                    .map(keyValue -> new MethodArgument(keyValue.getName(), keyValue.getValue())).collect(Collectors.toList());
+            Constants.setMethodArgs(methodArgs, sampler);
+        }
+        if (CollectionUtils.isNotEmpty(this.getAttachmentArgs())) {
+            List<MethodArgument> attachmentArgs = this.getAttachmentArgs().stream().filter(KeyValue::isValid).filter(KeyValue::isEnable)
+                    .map(keyValue -> new MethodArgument(keyValue.getName(), keyValue.getValue())).collect(Collectors.toList());
+            Constants.setAttachmentArgs(attachmentArgs, sampler);
+        }
         return sampler;
-    }
-
-
-    private ConfigTestElement dubboConfig() {
-        ConfigTestElement configTestElement = new ConfigTestElement();
-        configTestElement.setEnabled(true);
-        configTestElement.setName(this.getName());
-        configTestElement.setProperty(TestElement.TEST_CLASS, ConfigTestElement.class.getName());
-        configTestElement.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("DubboDefaultConfigGui"));
-        configTestElement.addConfigElement(configCenter(this.getConfigCenter()));
-        configTestElement.addConfigElement(registryCenter(this.getRegistryCenter()));
-        configTestElement.addConfigElement(consumerAndService(this.getConsumerAndService()));
-        return configTestElement;
     }
 
     private ConfigTestElement configCenter(MsConfigCenter configCenter) {

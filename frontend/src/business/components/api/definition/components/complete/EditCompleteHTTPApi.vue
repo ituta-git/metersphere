@@ -3,14 +3,14 @@
   <div class="card-container">
     <el-card class="card-content" v-loading="httpForm.loading">
 
-      <el-form :model="httpForm" :rules="rule" ref="httpForm" :inline="true" label-position="right">
+      <el-form :model="httpForm" :rules="rule" ref="httpForm" label-width="80px" label-position="right">
         <!-- 操作按钮 -->
         <div style="float: right;margin-right: 20px">
-          <el-button type="primary" size="small" @click="saveApi">{{$t('commons.save')}}</el-button>
-          <el-button type="primary" size="small" @click="runTest">{{$t('commons.test')}}</el-button>
+          <el-button type="primary" size="small" @click="saveApi" title="ctrl + s">{{ $t('commons.save') }}</el-button>
+          <el-button type="primary" size="small" @click="runTest">{{ $t('commons.test') }}</el-button>
         </div>
         <br/>
-        <p class="tip">{{$t('test_track.plan_view.base_info')}} </p>
+        <p class="tip">{{ $t('test_track.plan_view.base_info') }} </p>
 
         <!-- 基础信息 -->
         <div class="base-info">
@@ -34,24 +34,6 @@
 
           <el-row>
             <el-col :span="8">
-              <el-form-item :label="$t('test_track.module.module')" prop="moduleId">
-                <el-select class="ms-http-select" size="small" v-model="httpForm.moduleId">
-                  <div v-if="moduleOptions.length>0">
-                    <el-option v-for="item in moduleOptions" :key="item.id" :label="item.path" :value="item.id"/>
-                  </div>
-                  <div v-else>
-                    <el-option :key="0" :value="''">
-                      <div style="margin-left: 40px">
-                        <span style="font-size: 14px;color: #606266;font-weight: 48.93">{{$t('api_test.definition.select_comp.no_data')}},
-                        </span>
-                        <el-link type="primary" @click="createModules">{{$t('api_test.definition.select_comp.add_data')}}</el-link>
-                      </div>
-                    </el-option>
-                  </div>
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
               <el-form-item :label="$t('api_test.definition.request.responsible')" prop="userId">
                 <el-select v-model="httpForm.userId"
                            :placeholder="$t('api_test.definition.request.responsible')" filterable size="small"
@@ -65,7 +47,26 @@
                 </el-select>
               </el-form-item>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="7">
+              <el-form-item :label="$t('test_track.module.module')" prop="moduleId">
+                <el-select class="ms-http-select" size="small" v-model="httpForm.moduleId">
+                  <div v-if="moduleOptions.length>0">
+                    <el-option v-for="item in moduleOptions" :key="item.id" :label="item.path" :value="item.id"/>
+                  </div>
+                  <div v-else>
+                    <el-option :key="0" :value="''">
+                      <div style="margin-left: 40px">
+                        <span style="font-size: 14px;color: #606266;font-weight: 48.93">{{ $t('api_test.definition.select_comp.no_data') }},
+                        </span>
+                        <el-link type="primary" @click="createModules">{{ $t('api_test.definition.select_comp.add_data') }}</el-link>
+                      </div>
+                    </el-option>
+                  </div>
+                </el-select>
+              </el-form-item>
+            </el-col>
+
+            <el-col :span="7">
               <el-form-item :label="$t('commons.status')" prop="status">
                 <el-select class="ms-http-select" size="small" v-model="httpForm.status">
                   <el-option v-for="item in options" :key="item.id" :label="item.label" :value="item.id"/>
@@ -73,63 +74,74 @@
               </el-form-item>
             </el-col>
           </el-row>
-
           <el-row>
-            <el-form-item :label="$t('commons.description')" prop="description">
-              <el-input class="ms-http-textarea"
-                        v-model="httpForm.description"
-                        type="textarea"
-                        :autosize="{ minRows: 2, maxRows: 10}"
-                        :rows="2" size="small"/>
-            </el-form-item>
+            <el-col :span="8">
+              <el-form-item :label="$t('commons.tag')" prop="tag">
+                <ms-input-tag :currentScenario="httpForm" ref="tag"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="16">
+              <el-form-item :label="$t('commons.description')" prop="description">
+                <el-input class="ms-http-textarea"
+                          v-model="httpForm.description"
+                          type="textarea"
+                          :autosize="{ minRows: 2, maxRows: 10}"
+                          :rows="2" size="small"/>
+              </el-form-item>
+            </el-col>
           </el-row>
         </div>
 
         <!-- 请求参数 -->
         <div>
-          <p class="tip">{{$t('api_test.definition.request.req_param')}} </p>
+          <p class="tip">{{ $t('api_test.definition.request.req_param') }} </p>
           <ms-api-request-form :showScript="false" :request="request" :headers="request.headers" :isShowEnable="isShowEnable"/>
         </div>
 
       </el-form>
 
       <!-- 响应内容-->
-      <p class="tip">{{$t('api_test.definition.request.res_param')}} </p>
+      <p class="tip">{{ $t('api_test.definition.request.res_param') }} </p>
       <ms-response-text :response="response"></ms-response-text>
     </el-card>
   </div>
 </template>
 
 <script>
-  import MsApiRequestForm from "../request/http/ApiRequestForm";
-  import MsResponseText from "../response/ResponseText";
-  import {WORKSPACE_ID} from '../../../../../../common/js/constants';
-  import {REQ_METHOD, API_STATUS} from "../../model/JsonData";
-  import MsJsr233Processor from "../processor/Jsr233Processor";
-  import {KeyValue} from "../../model/ApiTestModel";
 
-  export default {
-    name: "MsAddCompleteHttpApi",
-    components: {MsResponseText, MsApiRequestForm, MsJsr233Processor},
-    data() {
-      let validateURL = (rule, value, callback) => {
-        if (!this.httpForm.path.startsWith("/") || this.httpForm.path.match(/\s/) != null) {
-          callback(this.$t('api_test.definition.request.path_valid_info'));
-        }
-        callback();
-      };
-      return {
+import MsApiRequestForm from "../request/http/ApiHttpRequestForm";
+import MsResponseText from "../response/ResponseText";
+import {WORKSPACE_ID} from '../../../../../../common/js/constants';
+import {API_STATUS, REQ_METHOD} from "../../model/JsonData";
+import {KeyValue} from "../../model/ApiTestModel";
+import MsInputTag from "@/business/components/api/automation/scenario/MsInputTag";
+import MsJsr233Processor from "../../../automation/scenario/component/Jsr233Processor";
+
+export default {
+  name: "MsAddCompleteHttpApi",
+  components: {MsJsr233Processor, MsResponseText, MsApiRequestForm, MsInputTag},
+  data() {
+    let validateURL = (rule, value, callback) => {
+      if (!this.httpForm.path.startsWith("/") || this.httpForm.path.match(/\s/) != null) {
+        callback(this.$t('api_test.definition.request.path_valid_info'));
+      }
+      callback();
+    };
+    return {
         rule: {
           name: [
             {required: true, message: this.$t('test_track.case.input_name'), trigger: 'blur'},
-            {max: 50, message: this.$t('test_track.length_less_than') + '50', trigger: 'blur'}
+            {max: 100, message: this.$t('test_track.length_less_than') + '100', trigger: 'blur'}
           ],
-          path: [{required: true, message: this.$t('api_test.definition.request.path_info'), trigger: 'blur'}, {validator: validateURL, trigger: 'blur'}],
+          path: [{required: true, message: this.$t('api_test.definition.request.path_info'), trigger: 'blur'}, {
+            validator: validateURL,
+            trigger: 'blur'
+          }],
           userId: [{required: true, message: this.$t('test_track.case.input_maintainer'), trigger: 'change'}],
           moduleId: [{required: true, message: this.$t('test_track.case.input_module'), trigger: 'change'}],
           status: [{required: true, message: this.$t('commons.please_select'), trigger: 'change'}],
         },
-        httpForm: {environmentId: ""},
+        httpForm: {environmentId: "", tags: []},
         isShowEnable: false,
         maintainerOptions: [],
         currentModule: {},
@@ -137,7 +149,29 @@
         options: API_STATUS,
       }
     },
-    props: {moduleOptions: {}, request: {}, response: {}, basisData: {}},
+    props: {moduleOptions: {}, request: {}, response: {}, basisData: {}, syncTabs: Array},
+    watch: {
+      syncTabs() {
+        if (this.basisData && this.syncTabs && this.syncTabs.includes(this.basisData.id)) {
+          // 标示接口在其他地方更新过，当前页面需要同步
+          let url = "/api/definition/get/";
+          this.$get(url + this.basisData.id, response => {
+            if (response.data) {
+              let request = JSON.parse(response.data.request);
+              let index = this.syncTabs.findIndex(item => {
+                if (item === this.basisData.id) {
+                  return true;
+                }
+              })
+              this.syncTabs.splice(index, 1);
+              this.httpForm.path = response.data.path;
+              this.httpForm.method = response.data.method;
+              Object.assign(this.request, request);
+            }
+          });
+        }
+      }
+    },
     methods: {
       runTest() {
         this.$refs['httpForm'].validate((valid) => {
@@ -160,14 +194,16 @@
         this.request.path = this.httpForm.path;
         this.request.method = this.httpForm.method;
         this.httpForm.request.useEnvironment = undefined;
+        if (this.httpForm.tags instanceof Array) {
+          this.httpForm.tags = JSON.stringify(this.httpForm.tags);
+        }
       },
       saveApi() {
         this.$refs['httpForm'].validate((valid) => {
           if (valid) {
             this.setParameter();
             this.$emit('saveApi', this.httpForm);
-          }
-          else {
+          } else {
             return false;
           }
         })
@@ -188,7 +224,7 @@
         if (!this.httpForm.path || this.httpForm.path.indexOf('?') === -1) return;
         let url = this.getURL(this.addProtocol(this.httpForm.path));
         if (url) {
-          this.httpForm.path = decodeURIComponent("/" + url.hostname + url.pathname);
+          this.httpForm.path = decodeURIComponent(this.httpForm.path.substr(0, this.httpForm.path.indexOf("?")));
         }
       },
       addProtocol(url) {
@@ -219,6 +255,7 @@
       if (!this.basisData.environmentId) {
         this.basisData.environmentId = "";
       }
+
       this.httpForm = JSON.parse(JSON.stringify(this.basisData));
     }
   }
@@ -247,7 +284,7 @@
   }
 
   .ms-http-textarea {
-    width: 400px;
+    width: 100%;
   }
 
   .ms-left-cell {

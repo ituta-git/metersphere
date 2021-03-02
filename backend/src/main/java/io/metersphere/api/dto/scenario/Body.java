@@ -3,6 +3,7 @@ package io.metersphere.api.dto.scenario;
 import io.metersphere.api.dto.scenario.request.BodyFile;
 import io.metersphere.commons.json.JSONSchemaGenerator;
 import lombok.Data;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.protocol.http.sampler.HTTPSamplerProxy;
 import org.apache.jmeter.protocol.http.util.HTTPFileArg;
@@ -40,13 +41,19 @@ public class Body {
         if (StringUtils.equals(type, FORM_DATA) || StringUtils.equals(type, WWW_FROM)
                 || StringUtils.equals(type, BINARY)) {
             return true;
-        } else return false;
+        } else {
+            return false;
+        }
     }
+
     public boolean isOldKV() {
         if (StringUtils.equals(type, KV)) {
             return true;
-        } else return false;
+        } else {
+            return false;
+        }
     }
+
     public List<KeyValue> getBodyParams(HTTPSamplerProxy sampler, String requestId) {
         List<KeyValue> body = new ArrayList<>();
         if (this.isKV() || this.isBinary()) {
@@ -61,11 +68,11 @@ public class Body {
             if (!this.isJson()) {
                 sampler.setPostBodyRaw(true);
             } else {
-                if (StringUtils.isNotEmpty(this.format) && this.format.equals("JSON-SCHEMA") && this.getJsonSchema() != null) {
+                if (StringUtils.isNotEmpty(this.format) && "JSON-SCHEMA".equals(this.format) && this.getJsonSchema() != null) {
                     this.raw = JSONSchemaGenerator.getJson(com.alibaba.fastjson.JSON.toJSONString(this.getJsonSchema()));
                 }
             }
-            KeyValue keyValue = new KeyValue("", this.getRaw());
+            KeyValue keyValue = new KeyValue("", "JSON-SCHEMA", this.getRaw(), true, true);
             keyValue.setEnable(true);
             keyValue.setEncode(false);
             body.add(keyValue);
@@ -75,12 +82,16 @@ public class Body {
 
     private HTTPFileArg[] httpFileArgs(String requestId) {
         List<HTTPFileArg> list = new ArrayList<>();
-        this.getKvs().stream().filter(KeyValue::isFile).filter(KeyValue::isEnable).forEach(keyValue -> {
-            setFileArg(list, keyValue.getFiles(), keyValue, requestId);
-        });
-        this.getBinary().stream().filter(KeyValue::isFile).filter(KeyValue::isEnable).forEach(keyValue -> {
-            setFileArg(list, keyValue.getFiles(), keyValue, requestId);
-        });
+        if (CollectionUtils.isNotEmpty(this.getKvs())) {
+            this.getKvs().stream().filter(KeyValue::isFile).filter(KeyValue::isEnable).forEach(keyValue -> {
+                setFileArg(list, keyValue.getFiles(), keyValue, requestId);
+            });
+        }
+        if (CollectionUtils.isNotEmpty(this.getBinary())) {
+            this.getBinary().stream().filter(KeyValue::isFile).filter(KeyValue::isEnable).forEach(keyValue -> {
+                setFileArg(list, keyValue.getFiles(), keyValue, requestId);
+            });
+        }
         return list.toArray(new HTTPFileArg[0]);
     }
 

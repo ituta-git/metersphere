@@ -7,7 +7,7 @@
     <parent>
         <artifactId>metersphere-server</artifactId>
         <groupId>io.metersphere</groupId>
-        <version>1.6</version>
+        <version>1.7</version>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
@@ -68,7 +68,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -209,7 +212,7 @@
         <dependency>
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
-            <version>3.4.13</version>
+            <version>3.4.14</version>
         </dependency>
         <dependency>
             <groupId>org.apache.curator</groupId>
@@ -309,24 +312,6 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!--  buji-pac4j  -->
-        <dependency>
-            <groupId>org.pac4j</groupId>
-            <artifactId>pac4j-cas</artifactId>
-            <version>3.0.2</version>
-        </dependency>
-        <dependency>
-            <groupId>io.buji</groupId>
-            <artifactId>buji-pac4j</artifactId>
-            <version>4.0.0</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>shiro-web</artifactId>
-                    <groupId>org.apache.shiro</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
@@ -355,6 +340,11 @@
             <groupId>jaxen</groupId>
             <artifactId>jaxen</artifactId>
             <version>1.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>net.sourceforge.htmlcleaner</groupId>
+            <artifactId>htmlcleaner</artifactId>
+            <version>2.24</version>
         </dependency>
 
         <dependency>
@@ -390,7 +380,48 @@
             <artifactId>json-schema-validator</artifactId>
             <version>2.2.6</version>
         </dependency>
-
+        <!-- 添加jmeter包支持导入的jmx能正常执行 -->
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_bolt</artifactId>
+            <version>${jmeter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_jms</artifactId>
+            <version>${jmeter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_ftp</artifactId>
+            <version>${jmeter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_junit</artifactId>
+            <version>${jmeter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_ldap</artifactId>
+            <version>${jmeter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_mail</artifactId>
+            <version>${jmeter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_components</artifactId>
+            <version>${jmeter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_native</artifactId>
+            <version>${jmeter.version}</version>
+        </dependency>
+        <!-- 添加jmeter包支持导入的jmx能正常执行 -->
     </dependencies>
 
     <build>

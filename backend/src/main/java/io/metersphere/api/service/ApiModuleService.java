@@ -24,7 +24,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
+import org.apache.commons.collections.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.util.*;
@@ -174,6 +174,11 @@ public class ApiModuleService extends NodeTreeService<ApiModuleDTO> {
             ApiModuleExample.Criteria criteria = example.createCriteria();
             criteria.andNameEqualTo(node.getName())
                     .andProjectIdEqualTo(node.getProjectId());
+
+            if (StringUtils.isNotBlank(node.getProtocol())) {
+                criteria.andProtocolEqualTo(node.getProtocol());
+            }
+
             if (StringUtils.isNotBlank(node.getParentId())) {
                 criteria.andParentIdEqualTo(node.getParentId());
             } else {
@@ -214,29 +219,28 @@ public class ApiModuleService extends NodeTreeService<ApiModuleDTO> {
         request.setUpdateTime(System.currentTimeMillis());
         checkApiModuleExist(request);
         List<ApiDefinitionResult> apiDefinitionResults = queryByModuleIds(request.getNodeIds());
-
-        apiDefinitionResults.forEach(apiDefinition -> {
-            if (StringUtils.isNotBlank(apiDefinition.getModulePath())) {
-                StringBuilder path = new StringBuilder(apiDefinition.getModulePath());
-                List<String> pathLists = Arrays.asList(path.toString().split("/"));
-                pathLists.set(request.getLevel(), request.getName());
-                path.delete(0, path.length());
-                for (int i = 1; i < pathLists.size(); i++) {
-                    path = path.append("/").append(pathLists.get(i));
+        if (CollectionUtils.isNotEmpty(apiDefinitionResults)) {
+            apiDefinitionResults.forEach(apiDefinition -> {
+                if (apiDefinition != null && StringUtils.isNotBlank(apiDefinition.getModulePath())) {
+                    StringBuilder path = new StringBuilder(apiDefinition.getModulePath());
+                    List<String> pathLists = Arrays.asList(path.toString().split("/"));
+                    pathLists.set(request.getLevel(), request.getName());
+                    path.delete(0, path.length());
+                    for (int i = 1; i < pathLists.size(); i++) {
+                        path = path.append("/").append(pathLists.get(i));
+                    }
+                    apiDefinition.setModulePath(path.toString());
                 }
-                apiDefinition.setModulePath(path.toString());
-            }
-        });
-
-        batchUpdateApiDefinition(apiDefinitionResults);
-
+            });
+            batchUpdateApiDefinition(apiDefinitionResults);
+        }
         return apiModuleMapper.updateByPrimaryKeySelective(request);
     }
 
     public int deleteNode(List<String> nodeIds) {
         ApiDefinitionExample apiDefinitionExample = new ApiDefinitionExample();
         apiDefinitionExample.createCriteria().andModuleIdIn(nodeIds);
-        apiDefinitionMapper.deleteByExample(apiDefinitionExample);
+        extApiDefinitionMapper.removeToGcByExample(apiDefinitionExample);   //  删除模块，则模块下的接口放入回收站
 
         ApiModuleExample apiDefinitionNodeExample = new ApiModuleExample();
         apiDefinitionNodeExample.createCriteria().andIdIn(nodeIds);
@@ -296,7 +300,7 @@ public class ApiModuleService extends NodeTreeService<ApiModuleDTO> {
         if (level > 8) {
             MSException.throwException(Translator.get("node_deep_limit"));
         }
-        if (rootNode.getId().equals("root")) {
+        if ("root".equals(rootNode.getId())) {
             rootPath = "";
         }
         ApiModule apiDefinitionNode = new ApiModule();
@@ -328,5 +332,27 @@ public class ApiModuleService extends NodeTreeService<ApiModuleDTO> {
         sqlSession.flushStatements();
     }
 
-
+    public ApiModule getModuleByName(String projectId, String protocol) {
+        ApiModuleExample example = new ApiModuleExample();
+        ApiModuleExample.Criteria criteria = example.createCriteria();
+        criteria.andNameEqualTo("bug")
+                .andProjectIdEqualTo(projectId).andProtocolEqualTo(protocol);
+        List<ApiModule> modules = apiModuleMapper.selectByExample(example);
+        if (CollectionUtils.isNotEmpty(modules)) {
+            return modules.get(0);
+        } else {
+            ApiModule node = new ApiModule();
+            node.setName("bug");
+            node.setLevel(1);
+            node.setPos(0.0);
+            node.setParentId(null);
+            node.setProjectId(projectId);
+            node.setProtocol(protocol);
+            node.setCreateTime(System.currentTimeMillis());
+            node.setUpdateTime(System.currentTimeMillis());
+            node.setId(UUID.randomUUID().toString());
+            apiModuleMapper.insertSelective(node);
+            return node;
+        }
+    }
 }

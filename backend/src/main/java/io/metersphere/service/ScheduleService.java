@@ -2,11 +2,10 @@ package io.metersphere.service;
 
 import com.alibaba.fastjson.JSON;
 import io.metersphere.api.dto.datacount.response.TaskInfoResult;
-import io.metersphere.base.domain.Schedule;
-import io.metersphere.base.domain.ScheduleExample;
-import io.metersphere.base.domain.User;
-import io.metersphere.base.domain.UserExample;
+import io.metersphere.api.dto.definition.ApiSwaggerUrlDTO;
+import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.ScheduleMapper;
+import io.metersphere.base.mapper.SwaggerUrlProjectMapper;
 import io.metersphere.base.mapper.UserMapper;
 import io.metersphere.base.mapper.ext.ExtScheduleMapper;
 import io.metersphere.commons.constants.ScheduleGroup;
@@ -19,10 +18,7 @@ import io.metersphere.commons.utils.SessionUtils;
 import io.metersphere.controller.request.OrderRequest;
 import io.metersphere.controller.request.QueryScheduleRequest;
 import io.metersphere.dto.ScheduleDao;
-import io.metersphere.job.sechedule.ApiScenarioTestJob;
-import io.metersphere.job.sechedule.ApiTestJob;
-import io.metersphere.job.sechedule.ScheduleManager;
-import io.metersphere.job.sechedule.TestPlanTestJob;
+import io.metersphere.job.sechedule.*;
 import org.apache.commons.lang3.StringUtils;
 import org.quartz.JobKey;
 import org.quartz.SchedulerException;
@@ -49,6 +45,8 @@ public class ScheduleService {
     private ExtScheduleMapper extScheduleMapper;
     @Resource
     private UserMapper userMapper;
+    @Resource
+    private SwaggerUrlProjectMapper swaggerUrlProjectMapper;
 
     public void addSchedule(Schedule schedule) {
         schedule.setId(UUID.randomUUID().toString());
@@ -56,6 +54,12 @@ public class ScheduleService {
         schedule.setCreateTime(System.currentTimeMillis());
         schedule.setUpdateTime(System.currentTimeMillis());
         scheduleMapper.insert(schedule);
+    }
+    public void addSwaggerUrlSchedule(SwaggerUrlProject swaggerUrlProject) {
+        swaggerUrlProjectMapper.insert(swaggerUrlProject);
+    }
+    public ApiSwaggerUrlDTO selectApiSwaggerUrlDTO(String id){
+        return extScheduleMapper.select(id);
     }
 
     public Schedule getSchedule(String ScheduleId) {
@@ -91,6 +95,25 @@ public class ScheduleService {
         return scheduleMapper.deleteByExample(scheduleExample);
     }
 
+    public int deleteScheduleAndJobByResourceId(String resourceId,String group) {
+        ScheduleExample scheduleExample = new ScheduleExample();
+        scheduleExample.createCriteria().andResourceIdEqualTo(resourceId);
+        removeJob(resourceId,group);
+        return scheduleMapper.deleteByExample(scheduleExample);
+    }
+
+    public void removeJob(String resourceId,String group) {
+        if(StringUtils.equals(ScheduleGroup.API_SCENARIO_TEST.name(),group)){
+            scheduleManager.removeJob(ApiScenarioTestJob.getJobKey(resourceId), ApiScenarioTestJob.getTriggerKey(resourceId));
+        }else if(StringUtils.equals(ScheduleGroup.TEST_PLAN_TEST.name(),group)){
+            scheduleManager.removeJob(TestPlanTestJob.getJobKey(resourceId), TestPlanTestJob.getTriggerKey(resourceId));
+        }else if(StringUtils.equals(ScheduleGroup.SWAGGER_IMPORT.name(),group)){
+            scheduleManager.removeJob(SwaggerUrlImportJob.getJobKey(resourceId), SwaggerUrlImportJob.getTriggerKey(resourceId));
+        }else{
+            scheduleManager.removeJob(ApiTestJob.getJobKey(resourceId), ApiTestJob.getTriggerKey(resourceId));
+        }
+    }
+
     public List<Schedule> listSchedule() {
         ScheduleExample example = new ScheduleExample();
         return scheduleMapper.selectByExample(example);
@@ -104,6 +127,7 @@ public class ScheduleService {
 
     public void startEnableSchedules() {
         List<Schedule> Schedules = getEnableSchedule();
+
         Schedules.forEach(schedule -> {
             try {
                 if (schedule.getEnable()) {
@@ -122,7 +146,7 @@ public class ScheduleService {
     public Schedule buildApiTestSchedule(Schedule request) {
         Schedule schedule = new Schedule();
         schedule.setResourceId(request.getResourceId());
-        schedule.setEnable(request.getEnable());
+        schedule.setEnable(true);
         schedule.setValue(request.getValue().trim());
         schedule.setKey(request.getResourceId());
         schedule.setUserId(SessionUtils.getUser().getId());
@@ -138,7 +162,8 @@ public class ScheduleService {
         String cronExpression = request.getValue();
         if (enable != null && enable && StringUtils.isNotBlank(cronExpression)) {
             try {
-                scheduleManager.addOrUpdateCronJob(jobKey, triggerKey, clazz, cronExpression, scheduleManager.getDefaultJobDataMap(request.getResourceId(), cronExpression, SessionUtils.getUser().getId()));
+                scheduleManager.addOrUpdateCronJob(jobKey, triggerKey, clazz, cronExpression,
+                        scheduleManager.getDefaultJobDataMap(request.getResourceId(), cronExpression, SessionUtils.getUser().getId()));
             } catch (SchedulerException e) {
                 LogUtil.error(e.getMessage(), e);
                 MSException.throwException("定时任务开启异常");

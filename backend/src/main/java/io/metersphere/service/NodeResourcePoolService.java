@@ -12,6 +12,7 @@ import io.metersphere.dto.TestResourcePoolDTO;
 import io.metersphere.i18n.Translator;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -39,15 +40,15 @@ public class NodeResourcePoolService {
         }
 
         deleteTestResource(testResourcePool.getId());
-        List<String> nodeIps = testResourcePool.getResources().stream()
+        List<ImmutablePair> Ip_Port = testResourcePool.getResources().stream()
                 .map(resource -> {
                     NodeDTO nodeDTO = JSON.parseObject(resource.getConfiguration(), NodeDTO.class);
-                    return nodeDTO.getIp();
+                    return new ImmutablePair(nodeDTO.getIp(), nodeDTO.getPort());
                 })
                 .distinct()
                 .collect(Collectors.toList());
-        if (nodeIps.size() < testResourcePool.getResources().size()) {
-            MSException.throwException(Translator.get("duplicate_node_ip"));
+        if (Ip_Port.size() < testResourcePool.getResources().size()) {
+            MSException.throwException(Translator.get("duplicate_node_ip_port"));
         }
         testResourcePool.setStatus(VALID.name());
         boolean isValid = true;

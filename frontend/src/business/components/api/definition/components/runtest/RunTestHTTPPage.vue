@@ -15,23 +15,7 @@
 
         <!-- 执行环境 -->
         <el-form-item prop="environmentId">
-          <el-select v-model="api.environmentId" size="small" class="ms-htt-width"
-                     :placeholder="$t('api_test.definition.request.run_env')"
-                     @change="environmentChange" clearable>
-            <el-option v-for="(environment, index) in environments" :key="index"
-                       :label="environment.name + (environment.config.httpConfig.socket ? (': ' + environment.config.httpConfig.protocol + '://' + environment.config.httpConfig.socket) : '')"
-                       :value="environment.id"/>
-            <el-button class="environment-button" size="mini" type="primary" @click="openEnvironmentConfig">
-              {{ $t('api_test.environment.environment_config') }}
-            </el-button>
-            <template v-slot:empty>
-              <div class="empty-environment">
-                <el-button class="environment-button" size="mini" type="primary" @click="openEnvironmentConfig">
-                  {{ $t('api_test.environment.environment_config') }}
-                </el-button>
-              </div>
-            </template>
-          </el-select>
+          <environment-select :current-data="api" :project-id="projectId"/>
         </el-form-item>
 
         <!-- 请求地址 -->
@@ -59,13 +43,15 @@
 
         <p class="tip">{{$t('api_test.definition.request.req_param')}} </p>
         <!-- HTTP 请求参数 -->
-        <ms-api-request-form :headers="api.request.headers" :request="api.request"/>
+        <ms-api-request-form :isShowEnable="true" :headers="api.request.headers" :request="api.request"/>
 
       </el-form>
       <!--返回结果-->
       <!-- HTTP 请求返回数据 -->
       <p class="tip">{{$t('api_test.definition.request.res_param')}} </p>
       <ms-request-result-tail :response="responseData" ref="runResult"/>
+
+      <ms-jmx-step :request="api.request" :response="responseData"/>
 
     </el-card>
 
@@ -77,36 +63,35 @@
                       :currentApi="api"
                       ref="caseList"/>
 
-    <!-- 环境 -->
-    <api-environment-config ref="environmentConfig" @close="environmentConfigClose"/>
     <!-- 执行组件 -->
-    <ms-run :debug="false" :environment="api.environment" :reportId="reportId" :run-data="runData"
+    <ms-run :debug="false" :environment="api.environment" :reportId="reportId" :run-data="runData" :env-map="envMap"
             @runRefresh="runRefresh" ref="runTest"/>
 
   </div>
 </template>
 
 <script>
-  import MsApiRequestForm from "../request/http/ApiRequestForm";
-  import {downloadFile, getUUID, getCurrentProjectID} from "@/common/js/utils";
-  import MsApiCaseList from "../case/ApiCaseList";
-  import MsContainer from "../../../../common/components/MsContainer";
-  import {parseEnvironment} from "../../model/EnvironmentModel";
-  import ApiEnvironmentConfig from "../environment/ApiEnvironmentConfig";
-  import MsRequestResultTail from "../response/RequestResultTail";
-  import MsRun from "../Run";
-  import {REQ_METHOD} from "../../model/JsonData";
+import MsApiRequestForm from "../request/http/ApiHttpRequestForm";
+import {getUUID} from "@/common/js/utils";
+import MsApiCaseList from "../case/ApiCaseList";
+import MsContainer from "../../../../common/components/MsContainer";
+import MsRequestResultTail from "../response/RequestResultTail";
+import MsRun from "../Run";
+import {REQ_METHOD} from "../../model/JsonData";
+import EnvironmentSelect from "../environment/EnvironmentSelect";
+import MsJmxStep from "../step/JmxStep";
 
-  export default {
-    name: "RunTestHTTPPage",
-    components: {
-      MsApiRequestForm,
-      MsApiCaseList,
-      MsContainer,
-      MsRequestResultTail,
-      ApiEnvironmentConfig,
-      MsRun
-    },
+export default {
+  name: "RunTestHTTPPage",
+  components: {
+    EnvironmentSelect,
+    MsApiRequestForm,
+    MsApiCaseList,
+    MsContainer,
+    MsRequestResultTail,
+    MsRun,
+    MsJmxStep
+  },
     data() {
       return {
         visible: false,
@@ -118,7 +103,6 @@
         refreshSign: "",
         responseData: {type: 'HTTP', responseResult: {}, subRequestResults: []},
         reqOptions: REQ_METHOD,
-        environments: [],
         rules: {
           method: [{required: true, message: this.$t('test_track.case.input_maintainer'), trigger: 'change'}],
           path: [{required: true, message: this.$t('api_test.definition.request.path_info'), trigger: 'blur'}],
@@ -126,10 +110,10 @@
         },
         runData: [],
         reportId: "",
-        projectId: "",
+        envMap: new Map
       }
     },
-    props: {apiData: {}, currentProtocol: String,},
+    props: {apiData: {}, currentProtocol: String, syncTabs: Array, projectId: String},
     methods: {
       handleCommand(e) {
         switch (e) {
@@ -203,11 +187,11 @@
       },
       saveAsApi() {
         let data = {};
-        data.request = JSON.stringify(this.api.request);
+        let req = this.api.request;
+        req.id = getUUID();
+        data.request = JSON.stringify(req);
         data.method = this.api.method;
         data.url = this.api.url;
-        let id = getUUID();
-        data.id = id;
         data.status = this.api.status;
         data.userId = this.api.userId;
         data.description = this.api.description;
@@ -218,9 +202,14 @@
         let bodyFiles = this.getBodyUploadFiles();
         this.api.method = this.api.request.method;
         this.api.path = this.api.request.path;
+        console.log(this.api)
+        console.log(typeof (bodyFiles))
         this.$fileUpload(url, null, bodyFiles, this.api, () => {
           this.$success(this.$t('commons.save_success'));
           this.$emit('saveApi', this.api);
+          if (this.syncTabs.indexOf(this.api.id) === -1) {
+            this.syncTabs.push(this.api.id);
+          }
         });
       },
       selectTestCase(item) {
@@ -230,50 +219,7 @@
           this.api.request = this.currentRequest;
         }
       },
-      getEnvironments() {
-        if (this.projectId) {
-          this.$get('/api/environment/list/' + this.projectId, response => {
-            this.environments = response.data;
-            this.environments.forEach(environment => {
-              parseEnvironment(environment);
-            });
-            let hasEnvironment = false;
-            for (let i in this.environments) {
-              if (this.environments[i].id === this.api.environmentId) {
-                this.api.environmentId = this.environments[i].id;
-                hasEnvironment = true;
-                break;
-              }
-            }
-            if (!hasEnvironment) {
-              this.api.environmentId = '';
-              this.api.environment = undefined;
-            }
-          });
-        } else {
-          this.api.environmentId = '';
-          this.api.environment = undefined;
-        }
-      },
-      openEnvironmentConfig() {
-        if (!this.projectId) {
-          this.$error(this.$t('api_test.select_project'));
-          return;
-        }
-        this.$refs.environmentConfig.open(this.projectId);
-      },
-      environmentChange(value) {
-        for (let i in this.environments) {
-          if (this.environments[i].id === value) {
-            this.api.environmentId = value;
-            this.api.request.useEnvironment = value;
-            break;
-          }
-        }
-      },
-      environmentConfigClose() {
-        this.getEnvironments();
-      },
+
       refresh() {
         this.$emit('refresh');
       },
@@ -288,11 +234,10 @@
       }
     },
     created() {
-      this.projectId = getCurrentProjectID();
-      this.api = this.apiData;
+      // 深度复制
+      this.api = JSON.parse(JSON.stringify(this.apiData));
       this.api.protocol = this.currentProtocol;
       this.currentRequest = this.api.request;
-      this.getEnvironments();
       this.getResult();
     }
   }
@@ -301,11 +246,6 @@
 <style scoped>
   .ms-htt-width {
     width: 350px;
-  }
-
-  .environment-button {
-    margin-left: 20px;
-    padding: 7px;
   }
 
   .tip {

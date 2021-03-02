@@ -2,52 +2,77 @@
 
   <div class="card-container" v-loading="loading">
     <el-card class="card-content">
-      <el-dropdown split-button type="primary" class="ms-api-buttion" @click="handleCommand"
-                   @command="handleCommand" size="small" style="float: right;margin-right: 20px">
-        {{$t('commons.test')}}
-        <el-dropdown-menu slot="dropdown">
-          <el-dropdown-item command="save_as">{{$t('api_test.definition.request.save_as')}}</el-dropdown-item>
-        </el-dropdown-menu>
-      </el-dropdown>
+      <el-form :model="debugForm" :rules="rules" ref="debugForm" :inline="true" label-position="right">
+        <p class="tip">{{$t('test_track.plan_view.base_info')}} </p>
+        <el-form-item :label="$t('api_test.request.tcp.server')" prop="server">
+          <el-input v-model="request.server" maxlength="300" show-word-limit size="small"/>
+        </el-form-item>
+        <el-form-item :label="$t('api_test.request.tcp.port')" prop="port" label-width="60px">
+          <el-input-number v-model="request.port" controls-position="right" :min="0" :max="65535" size="small"/>
+        </el-form-item>
+        <el-form-item>
+          <el-button v-if="scenario" size="small" type="primary" @click="handleCommand"> {{ $t('commons.test') }}
+          </el-button>
+
+          <el-dropdown v-else split-button type="primary" class="ms-api-buttion" @click="handleCommand"
+                       @command="handleCommand" size="small" style="float: right;margin-right: 20px">
+            {{ $t('commons.test') }}
+            <el-dropdown-menu slot="dropdown">
+              <el-dropdown-item command="save_as">{{ $t('api_test.definition.request.save_as_case') }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </el-dropdown>
+        </el-form-item>
+      </el-form>
 
       <p class="tip">{{$t('api_test.definition.request.req_param')}} </p>
       <!-- TCP 请求参数 -->
-      <ms-basis-parameters :request="request" @callback="runDebug" ref="requestForm"/>
-
+      <tcp-basis-parameters :request="request" @callback="runDebug" ref="requestForm"/>
 
       <!-- TCP 请求返回数据 -->
       <p class="tip">{{$t('api_test.definition.request.res_param')}} </p>
       <ms-request-result-tail :response="responseData" :currentProtocol="currentProtocol" ref="debugResult"/>
 
+      <ms-jmx-step :request="request" :response="responseData"/>
+
       <!-- 执行组件 -->
       <ms-run :debug="true" :reportId="reportId" :run-data="runData" @runRefresh="runRefresh" ref="runTest"/>
     </el-card>
     <div v-if="scenario">
-      <el-button style="float: right;margin: 20px" type="primary" @click="handleCommand('save_as')"> {{$t('commons.save')}}</el-button>
+      <el-button style="float: right;margin: 20px" type="primary" @click="handleCommand('save_as_api')"> {{$t('commons.save')}}</el-button>
     </div>
+    <!-- 加载用例 -->
+    <ms-api-case-list :loaded="false" ref="caseList"/>
+
   </div>
 
 </template>
 
 <script>
-  import MsApiRequestForm from "../request/http/ApiRequestForm";
-  import MsResponseResult from "../response/ResponseResult";
-  import MsRequestMetric from "../response/RequestMetric";
-  import {getUUID, getCurrentUser} from "@/common/js/utils";
-  import MsResponseText from "../response/ResponseText";
-  import MsRun from "../Run";
-  import {createComponent} from "../jmeter/components";
-  import {REQ_METHOD} from "../../model/JsonData";
-  import MsRequestResultTail from "../response/RequestResultTail";
-  import MsBasisParameters from "../request/tcp/BasisParameters";
+import MsApiRequestForm from "../request/http/ApiHttpRequestForm";
+import MsResponseResult from "../response/ResponseResult";
+import MsRequestMetric from "../response/RequestMetric";
+import {getUUID} from "@/common/js/utils";
+import MsResponseText from "../response/ResponseText";
+import MsRun from "../Run";
+import {createComponent} from "../jmeter/components";
+import {REQ_METHOD} from "../../model/JsonData";
+import MsRequestResultTail from "../response/RequestResultTail";
+import TcpBasisParameters from "../request/tcp/TcpBasisParameters";
+import MsJmxStep from "../step/JmxStep";
+import MsApiCaseList from "../case/ApiCaseList";
 
-  export default {
-    name: "ApiConfig",
-    components: {MsRequestResultTail, MsResponseResult, MsApiRequestForm, MsRequestMetric, MsResponseText, MsRun, MsBasisParameters},
-    props: {
-      currentProtocol: String,
-      scenario: Boolean,
-      testCase: {},
+export default {
+  name: "ApiConfig",
+  components: {
+    MsJmxStep,
+    TcpBasisParameters,
+    MsRequestResultTail, MsResponseResult, MsApiRequestForm, MsRequestMetric, MsResponseText, MsRun, MsApiCaseList
+  },
+  props: {
+    currentProtocol: String,
+    scenario: Boolean,
+    testCase: {},
     },
     data() {
       return {
@@ -99,6 +124,8 @@
       handleCommand(e) {
         if (e === "save_as") {
           this.saveAs();
+        } else if (e === 'save_as_api') {
+          this.saveAsApi();
         } else {
           this.$refs['requestForm'].validate();
         }
@@ -117,9 +144,21 @@
         this.loading = false;
         this.$refs.debugResult.reload();
       },
+      saveAsApi() {
+        let obj = {request: this.request};
+        obj.request.id = getUUID();
+        this.$emit('saveAs', obj);
+      },
       saveAs() {
         let obj = {request: this.request};
-        this.$emit('saveAs', obj);
+        obj.server = this.debugForm.server;
+        obj.port = this.debugForm.port;
+        obj.request.id = getUUID();
+        obj.saved = true;
+        obj.protocol = this.currentProtocol;
+        obj.status = "Underway";
+        obj.method = this.currentProtocol;
+        this.$refs.caseList.saveApiAndCase(obj);
       }
     }
   }

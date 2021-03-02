@@ -10,6 +10,7 @@ import io.metersphere.commons.constants.UserStatus;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.user.SessionUser;
 import io.metersphere.commons.utils.CodingUtil;
+import io.metersphere.commons.utils.CommonBeanFactory;
 import io.metersphere.commons.utils.SessionUtils;
 import io.metersphere.controller.ResultHolder;
 import io.metersphere.controller.request.LoginRequest;
@@ -23,6 +24,7 @@ import io.metersphere.dto.UserDTO;
 import io.metersphere.dto.UserRoleDTO;
 import io.metersphere.i18n.Translator;
 import io.metersphere.notice.domain.UserDetail;
+import io.metersphere.security.MsUserToken;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.*;
@@ -332,7 +334,7 @@ public class UserService {
                 MSException.throwException(Translator.get("user_email_already_exists"));
             }
         }
-
+        user.setPassword(null);
         user.setUpdateTime(System.currentTimeMillis());
         userMapper.updateByPrimaryKeySelective(user);
         // 禁用用户之后，剔除在线用户
@@ -565,7 +567,7 @@ public class UserService {
             }
         }
 
-        UsernamePasswordToken token = new UsernamePasswordToken(username, password);
+        MsUserToken token = new MsUserToken(username, password, login);
         Subject subject = SecurityUtils.getSubject();
         try {
             subject.login(token);
@@ -606,5 +608,12 @@ public class UserService {
 
     public List<User> searchUser(String condition) {
         return extUserMapper.searchUser(condition);
+    }
+
+    public void logout() throws Exception {
+        SSOService ssoService = CommonBeanFactory.getBean(SSOService.class);
+        if (ssoService != null) {
+            ssoService.logout();
+        }
     }
 }

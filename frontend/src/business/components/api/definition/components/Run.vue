@@ -1,8 +1,8 @@
 <template>
-  <div></div>
+  <span></span>
 </template>
 <script>
-  import {getUUID, getBodyUploadFiles} from "@/common/js/utils";
+  import {getUUID, getBodyUploadFiles, getCurrentProjectID, strMapToObj} from "@/common/js/utils";
   import ThreadGroup from "./jmeter/components/thread-group";
   import TestPlan from "./jmeter/components/test-plan";
 
@@ -14,7 +14,8 @@
       debug: Boolean,
       reportId: String,
       runData: Array,
-      type: String
+      type: String,
+      envMap: Map
     },
     data() {
       return {
@@ -64,19 +65,28 @@
         this.runData.forEach(item => {
           threadGroup.hashTree.push(item);
         })
-        let reqObj = {id: this.reportId, testElement: testPlan, type: this.type};
+
+        let projectId = "";
+        // 如果envMap不存在，是单接口调用
+        if (!this.envMap) {
+          projectId = getCurrentProjectID();
+        } else {
+          // 场景步骤下接口调用
+          projectId = this.runData.projectId;
+        }
+        let reqObj = {id: this.reportId, testElement: testPlan, type: this.type,projectId: projectId, environmentMap: strMapToObj(this.envMap)};
         let bodyFiles = getBodyUploadFiles(reqObj, this.runData);
         let url = "";
         if (this.debug) {
+          reqObj.reportId = this.reportId;
           url = "/api/definition/run/debug";
         } else {
-          reqObj.reportId = "run";
           url = "/api/definition/run";
         }
         this.$fileUpload(url, null, bodyFiles, reqObj, response => {
           this.runId = response.data;
           this.getResult();
-        }, erro => {
+        }, error => {
           this.$emit('runRefresh', {});
         });
       }

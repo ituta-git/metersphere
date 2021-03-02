@@ -3,10 +3,10 @@
     <el-card class="card-content" v-loading="result.loading">
       <template v-slot:header>
         <test-plan-load-case-list-header
-          :condition="condition"
-          :plan-id="planId"
-          @refresh="initTable"
-          @relevanceCase="$emit('relevanceCase')"
+            :condition="condition"
+            :plan-id="planId"
+            @refresh="initTable"
+            @relevanceCase="$emit('relevanceCase')"
         />
       </template>
 
@@ -23,74 +23,127 @@
             <show-more-btn :is-show="scope.row.showMore && !isReadOnly" :buttons="buttons" :size="selectRows.size"/>
           </template>
         </el-table-column>
-
-<!--        <el-table-column prop="num" label="ID" show-overflow-tooltip/>-->
-        <el-table-column
-          prop="caseName"
-          :label="$t('commons.name')"
-          show-overflow-tooltip>
-        </el-table-column>
-<!--        <el-table-column-->
-<!--          prop="projectName"-->
-<!--          :label="$t('load_test.project_name')"-->
-<!--          width="150"-->
-<!--          show-overflow-tooltip>-->
-<!--        </el-table-column>-->
-        <el-table-column
-          prop="userName"
-          :label="$t('load_test.user_name')"
-          show-overflow-tooltip>
-        </el-table-column>
-        <el-table-column
-          sortable
-          prop="createTime"
-          :label="$t('commons.create_time')">
-          <template v-slot:default="scope">
-            <span>{{ scope.row.createTime | timestampFormatDate }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          sortable
-          prop="updateTime"
-          :label="$t('commons.update_time')">
-          <template v-slot:default="scope">
-            <span>{{ scope.row.updateTime | timestampFormatDate }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="status"
-          column-key="status"
-          :filters="statusFilters"
-          :label="$t('commons.status')">
-          <template v-slot:default="{row}">
-            <ms-performance-test-status :row="row"/>
-          </template>
-        </el-table-column>
+        <template v-for="(item, index) in tableLabel">
+          <el-table-column v-if="item.id == 'num'" prop="num" label="ID" show-overflow-tooltip :key="index"/>
+          <el-table-column
+              v-if="item.id == 'caseName'"
+              prop="caseName"
+              :label="$t('commons.name')"
+              show-overflow-tooltip
+              :key="index">
+          </el-table-column>
+          <el-table-column
+              v-if="item.id == 'projectName'"
+              prop="projectName"
+              :label="$t('load_test.project_name')"
+              show-overflow-tooltip
+              :key="index">
+          </el-table-column>
+          <el-table-column
+              v-if="item.id == 'userName'"
+              prop="userName"
+              :label="$t('load_test.user_name')"
+              show-overflow-tooltip
+              :key="index">
+          </el-table-column>
+          <el-table-column
+              v-if="item.id == 'createTime'"
+              sortable
+              prop="createTime"
+              :label="$t('commons.create_time')"
+              :key="index">
+            <template v-slot:default="scope">
+              <span>{{ scope.row.createTime | timestampFormatDate }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+              v-if="item.id == 'status'"
+              prop="status"
+              column-key="status"
+              :filters="statusFilters"
+              :label="$t('commons.status')"
+              :key="index">
+            <template v-slot:default="{row}">
+              <ms-performance-test-status :row="row"/>
+            </template>
+          </el-table-column>
+          <el-table-column
+              v-if="item.id == 'caseStatus'"
+              prop="caseStatus"
+              :label="$t('test_track.plan.load_case.execution_status')"
+              :key="index">
+            <template v-slot:default="{row}">
+              <el-tag size="mini" type="danger" v-if="row.caseStatus === 'error'">
+                {{ row.caseStatus }}
+              </el-tag>
+              <el-tag size="mini" type="success" v-else-if="row.caseStatus === 'success'">
+                {{ row.caseStatus }}
+              </el-tag>
+              <el-tag size="mini" v-else-if="row.caseStatus === 'run'">
+                {{ row.caseStatus }}
+              </el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+              v-if="item.id == 'loadReportId'"
+              :label="$t('test_track.plan.load_case.report')"
+              show-overflow-tooltip
+              :key="index">
+            <template v-slot:default="scope">
+              <div v-loading="loading === scope.row.id">
+                <el-link type="info" @click="getReport(scope.row)" v-if="scope.row.loadReportId">
+                  {{ $t('test_track.plan.load_case.view_report') }}
+                </el-link>
+                <span v-else> - </span>
+              </div>
+            </template>
+          </el-table-column>
+        </template>
         <el-table-column v-if="!isReadOnly" :label="$t('commons.operating')" align="center">
+          <template slot="header">
+            <header-label-operate @exec="customHeader"/>
+          </template>
           <template v-slot:default="scope">
-            <ms-table-operator-button class="run-button" :is-tester-permission="true" :tip="$t('api_test.run')" icon="el-icon-video-play"
+            <ms-table-operator-button class="run-button" :is-tester-permission="true" :tip="$t('api_test.run')"
+                                      icon="el-icon-video-play"
                                       @exec="run(scope.row)" v-tester/>
             <ms-table-operator-button :is-tester-permission="true" :tip="$t('test_track.plan_view.cancel_relevance')"
                                       icon="el-icon-unlock" type="danger" @exec="handleDelete(scope.row)" v-tester/>
           </template>
         </el-table-column>
       </el-table>
+      <header-custom ref="headerCustom" :initTableData="initTable" :optionalFields=headerItems
+                     :type=type></header-custom>
       <ms-table-pagination :change="initTable" :current-page.sync="currentPage" :page-size.sync="pageSize"
                            :total="total"/>
     </el-card>
+
+    <load-case-report :report-id="reportId" ref="loadCaseReport" @refresh="initTable"/>
   </div>
 </template>
 
 <script>
-import TestPlanLoadCaseListHeader from "@/business/components/track/plan/view/comonents/load/TestPlanLoadCaseListHeader";
+import TestPlanLoadCaseListHeader
+  from "@/business/components/track/plan/view/comonents/load/TestPlanLoadCaseListHeader";
 import ShowMoreBtn from "@/business/components/track/case/components/ShowMoreBtn";
-import {_filter, _sort} from "@/common/js/utils";
 import MsTablePagination from "@/business/components/common/pagination/TablePagination";
 import MsPerformanceTestStatus from "@/business/components/performance/test/PerformanceTestStatus";
 import MsTableOperatorButton from "@/business/components/common/components/MsTableOperatorButton";
+import LoadCaseReport from "@/business/components/track/plan/view/comonents/load/LoadCaseReport";
+import {_filter, _sort, getLabel} from "@/common/js/tableUtils";
+import HeaderCustom from "@/business/components/common/head/HeaderCustom";
+import {TEST_CASE_LIST, TEST_PLAN_LOAD_CASE} from "@/common/js/constants";
+import {Test_Plan_Load_Case, Track_Test_Case} from "@/business/components/common/model/JsonData";
+import {getCurrentUser} from "@/common/js/utils";
+import HeaderLabelOperate from "@/business/components/common/head/HeaderLabelOperate";
+
 export default {
   name: "TestPlanLoadCaseList",
   components: {
+    HeaderLabelOperate,
+    HeaderCustom,
+    LoadCaseReport,
     TestPlanLoadCaseListHeader,
     ShowMoreBtn,
     MsTablePagination,
@@ -99,6 +152,9 @@ export default {
   },
   data() {
     return {
+      type: TEST_PLAN_LOAD_CASE,
+      headerItems: Test_Plan_Load_Case,
+      tableLabel: Test_Plan_Load_Case,
       condition: {},
       result: {},
       tableData: [],
@@ -106,16 +162,14 @@ export default {
       currentPage: 1,
       pageSize: 10,
       total: 0,
+      status: 'default',
       screenHeight: document.documentElement.clientHeight - 330,//屏幕高度
       buttons: [
         {
-          name: "批量编辑用例", handleClick: this.handleBatchEdit
+          name: this.$t('test_track.plan.load_case.unlink_in_bulk'), handleClick: this.handleDeleteBatch
         },
         {
-          name: "批量取消关联", handleClick: this.handleDeleteBatch
-        },
-        {
-          name: "批量执行用例", handleClick: this.handleRunBatch
+          name: this.$t('test_track.plan.load_case.batch_exec_cases'), handleClick: this.handleRunBatch
         }
       ],
       statusFilters: [
@@ -126,21 +180,26 @@ export default {
         {text: 'Completed', value: 'Completed'},
         {text: 'Error', value: 'Error'}
       ],
+      reportId: '',
+      loading: false,
+      statusScheduler: null
     }
   },
   props: {
-    selectNodeIds: Array,
+    selectProjectId: String,
     isReadOnly: {
       type: Boolean,
       default: false
     },
-    planId: String
+    planId: String,
+    clickType: String,
   },
   created() {
     this.initTable();
+    this.refreshStatus();
   },
   watch: {
-    selectNodeIds() {
+    selectProjectId() {
       this.initTable();
     },
     planId() {
@@ -148,12 +207,37 @@ export default {
     }
   },
   methods: {
+    customHeader() {
+      this.$refs.headerCustom.open(this.tableLabel)
+    },
     initTable() {
-      this.$post("/test/plan/load/case/list/" + this.currentPage + "/" + this.pageSize, {testPlanId: this.planId}, response => {
+      getLabel(this, TEST_PLAN_LOAD_CASE);
+      this.selectRows = new Set();
+      this.condition.testPlanId = this.planId;
+      if (this.selectProjectId && this.selectProjectId !== 'root') {
+        this.condition.projectId = this.selectProjectId;
+      }
+      if (this.clickType) {
+        if (this.status == 'default') {
+          this.condition.status = this.clickType;
+        } else {
+          this.condition.status = null;
+        }
+        this.status = 'all';
+      }
+      this.$post("/test/plan/load/case/list/" + this.currentPage + "/" + this.pageSize, this.condition, response => {
         let data = response.data;
-        this.total = data.itemCount;
-        this.tableData = data.listObject;
+        let {itemCount, listObject} = data;
+        this.total = itemCount;
+        this.tableData = listObject;
       })
+    },
+    refreshStatus() {
+      this.refreshScheduler = setInterval(() => {
+        // 如果有状态不是最终状态则定时查询
+        let arr = this.tableData.filter(data => data.status !== 'Completed' && data.status !== 'Error' && data.status !== 'Saved');
+        arr.length > 0 ? this.initTable() : clearInterval(this.refreshScheduler);
+      }, 8000);
     },
     handleSelectAll(selection) {
       if (selection.length > 0) {
@@ -177,20 +261,59 @@ export default {
         this.selectRows.add(row);
       }
     },
-    handleBatchEdit() {
-
-    },
     handleDeleteBatch() {
-
+      this.$alert(this.$t('test_track.plan_view.confirm_cancel_relevance') + "？", '', {
+        confirmButtonText: this.$t('commons.confirm'),
+        callback: (action) => {
+          if (action === 'confirm') {
+            let ids = Array.from(this.selectRows).map(row => row.id);
+            this.result = this.$post('/test/plan/load/case/batch/delete', ids, () => {
+              this.selectRows.clear();
+              this.initTable();
+              this.$success(this.$t('test_track.cancel_relevance_success'));
+            });
+          }
+        }
+      })
     },
     handleRunBatch() {
-
+      this.selectRows.forEach(loadCase => {
+        this._run(loadCase);
+      })
+      this.refreshStatus();
     },
-    run() {
-
+    run(loadCase) {
+      this._run(loadCase);
+      this.refreshStatus();
+    },
+    _run(loadCase) {
+      this.$post('/test/plan/load/case/run', {
+        id: loadCase.loadCaseId,
+        testPlanLoadId: loadCase.id,
+        triggerMode: 'CASE'
+      }).then(() => {
+        this.$notify.success({
+          title: loadCase.caseName,
+          message: this.$t('test_track.plan.load_case.exec').toString()
+        });
+        this.updateStatus(loadCase, 'run');
+      }).catch(() => {
+        this.updateStatus(loadCase, 'error');
+        this.$notify.error({
+          title: loadCase.caseName,
+          message: this.$t('test_track.plan.load_case.error').toString()
+        });
+      })
+    },
+    updateStatus(loadCase, status) {
+      this.$post('/test/plan/load/case/update', {id: loadCase.id, status: status}, () => {
+        this.$post('/test/plan/edit/status/' + loadCase.testPlanId, {}, () => {
+          this.initTable();
+        });
+      });
     },
     handleDelete(loadCase) {
-      this.$get('/test/plan/load/case/delete/' + loadCase.id, () => {
+      this.result = this.$get('/test/plan/load/case/delete/' + loadCase.id, () => {
         this.$success(this.$t('test_track.cancel_relevance_success'));
         this.$emit('refresh');
         this.initTable();
@@ -202,13 +325,39 @@ export default {
         this.condition.orders = [];
       }
       _sort(column, this.condition);
-      this.initTableData();
+      this.initTable();
     },
     filter(filters) {
       _filter(filters, this.condition);
-      this.initTableData();
+      this.initTable();
     },
-  }
+    getReport(data) {
+      const {loadReportId} = data;
+      this.reportId = loadReportId;
+      this.loading = data.id;
+      this.$post('/test/plan/load/case/report/exist', {
+        testPlanLoadCaseId: data.id,
+        reportId: loadReportId
+      }, response => {
+        let exist = response.data;
+        this.loading = "";
+        if (exist) {
+          this.$refs.loadCaseReport.drawer = true;
+        } else {
+          this.$warning(this.$t('test_track.plan.load_case.report_not_found'));
+        }
+      })
+    },
+    cancelRefresh() {
+      if (this.refreshScheduler) {
+        clearInterval(this.refreshScheduler);
+      }
+    }
+  },
+  beforeDestroy() {
+    console.log('beforeDestroy')
+    this.cancelRefresh();
+  },
 }
 </script>
 

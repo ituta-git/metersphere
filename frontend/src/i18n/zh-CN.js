@@ -1,11 +1,16 @@
 export default {
   commons: {
+    cover: '覆盖',
+    not_cover: '不覆盖',
+    import_mode: '导入模式',
+    import_module: '导入模块',
     please_fill_in_the_template: '请填写模版内容',
     cut_back_old_version: '切回旧版',
     cut_back_new_version: '切回新版',
     comment: '评论',
     examples: '示例',
     help_documentation: '帮助文档',
+    api_help_documentation: 'API文档',
     delete_cancelled: '已取消删除',
     workspace: '工作空间',
     organization: '组织',
@@ -30,7 +35,7 @@ export default {
     operating: '操作',
     input_limit: '长度在 {0} 到 {1} 个字符',
     login: '登录',
-    welcome: '欢迎回来，请输入用户名和密码登录',
+    welcome: '一站式开源持续测试平台',
     username: '姓名',
     password: '密码',
     input_username: '请输入用户姓名',
@@ -69,7 +74,8 @@ export default {
     not_filled: '未填写',
     please_select: '请选择',
     search_by_name: '根据名称搜索',
-    search_by_name_or_id: '根据ID或名称搜索',
+    search_by_name_or_id: '根据 ID/名称 搜索',
+    search_by_id_name_tag: '根据 ID/名称/标签 搜索',
     personal_information: '个人信息',
     exit_system: '退出系统',
     verification: '验证',
@@ -115,6 +121,7 @@ export default {
     input_login_username: '请输入用户 ID 或 邮箱',
     input_name: '请输入名称',
     please_upload: '请上传文件',
+    please_fill_path: '请填写ur路径',
     formatErr: '格式错误',
     please_save: '请先保存',
     reference_documentation: "参考文档",
@@ -127,6 +134,11 @@ export default {
     validate: "校验",
     batch_add: "批量添加",
     check_project_tip: "请先创建或选择项目",
+    auth_redirect_tip: '即将跳转到认证源页面进行认证',
+    tag_tip: "输入回车添加标签",
+    table: {
+      select_tip: "已选中 {0} 条数据"
+    },
     date: {
       select_date: '选择日期',
       start_date: '开始日期',
@@ -141,7 +153,8 @@ export default {
       name: "触发方式",
       manual: "手动触发",
       schedule: "定时任务",
-      api: "API调用"
+      api: "API调用",
+      case: "用例触发"
     },
     adv_search: {
       title: '高级搜索',
@@ -174,7 +187,12 @@ export default {
       case: "全部用例",
       review: "全部评审"
     },
-    image: '镜像'
+    image: '镜像',
+    tag: '标签',
+    module: {
+      select_module: "选择模块",
+      default_module: "默认模块",
+    }
   },
   license: {
     title: '授权管理',
@@ -195,8 +213,8 @@ export default {
   display: {
     title: '显示设置',
     logo: '系统 LOGO',
-    loginLogo: '登陆页面右侧图片',
-    loginImage: '登录页左上角 LOGO',
+    loginLogo: '登录页左上角 LOGO',
+    loginImage: '登陆页面右侧图片',
     loginTitle: '登陆页面提示信息',
     pageTitle: '页面 Title',
   },
@@ -243,6 +261,8 @@ export default {
       test_plan_task_notification: '测试计划任务通知',
       test_review_task_notice: '测试评审任务通知',
       create_new_notification: '创建新通知',
+      mail_template_example: '邮件模版',
+      robot_template: '机器人模版',
       select_events: '选择事件',
       defect_task_notification: '缺陷任务通知',
       select_receiving_method: '选择接收方式',
@@ -296,6 +316,7 @@ export default {
     delete_confirm: '确定要删除这个项目吗?',
     delete_tip: '删除该项目，会删除该项目下所有测试资源，确定要删除吗?',
     search_by_name: '根据名称搜索',
+    search_by_name_jar: '根据 名称 / jar包 搜索',
     input_name: '请输入项目名称',
     owning_workspace: '所属工作空间',
     please_choose_workspace: '请选择工作空间',
@@ -485,6 +506,7 @@ export default {
     export_config: "导出",
     enable_validate_tip: "没有可用请求",
     copy: "复制测试",
+    batch_add_parameter: "格式：参数名,必填,参数值,备注 <br/> 如：Accept-Encoding,必填,utf-8,编码",
     jar_config: {
       title: "jar包管理",
       jar_file: "jar包",
@@ -498,6 +520,8 @@ export default {
     },
     definition: {
       api_title: "接口列表",
+      case_title: "用例列表",
+      doc_title: "文档",
       api_name: "接口名称",
       api_status: "接口状态",
       api_type: "请求类型",
@@ -508,12 +532,20 @@ export default {
       api_case_status: "用例状态",
       api_case_passing_rate: "用例通过率",
       create_tip: "注: 详细的接口信息可以在编辑页面填写",
+      api_import: "接口导入",
+      check_select: "请勾选接口",
       select_comp: {
         no_data: "无数据",
         add_data: "去添加"
       },
       request: {
         grade_info: "按等级筛选",
+        grade_order_asc: "按用例等级从低到高",
+        grade_order_desc: "按用例等级从高到低",
+        create_time_order_asc: "按创建时间从前到后",
+        create_time_order_desc: "按创建时间从后到前",
+        update_time_order_asc: "按更新时间从前到后",
+        update_time_order_desc: "按更新时间从后到前",
         run_env: "运行环境",
         select_case: "搜索用例",
         case: "用例",
@@ -561,7 +593,41 @@ export default {
         create_info: '创建',
         update_info: '更新',
         batch_edit: "批量编辑",
+        batch_move: "批量移动",
         path_valid_info: "请求路径无效",
+        other_config: "其他设置",
+        message_template: "报文模版",
+        tcp_parameter_tip: "请求参数可以在请求模版通过${xxx}引用",
+      },
+      document: {
+        order: "排序方式",
+        create_time_sort: "按创建时间从后到前",
+        edit_time_positive_sequence: "按更新时间从前到后",
+        edit_time_Reverse_order: "按更新时间从后到前",
+        request_method: "请求方式",
+        request_interface: "请求接口",
+        search_by_api_name : "名称搜索",
+        request_info: "请求信息",
+        request_head: "请求头",
+        request_param: "参数",
+        request_body: "请求体",
+        example_presentation: "范例展示",
+        response_info: "响应信息",
+        response_head: "响应头",
+        response_body: "响应体",
+        response_code: "响应码",
+        table_coloum:{
+          name: "名称",
+          value: "值",
+          is_required: "是否必填",
+          desc: "描述",
+          type: "类型",
+          default_value: "默认值",
+        },
+        data_set: {
+          all: "全部",
+          none: "无"
+        },
       }
     },
     automation: {
@@ -569,7 +635,7 @@ export default {
       create_tag: "创建Tag",
       scenario_step: "场景步骤",
       step_total: "步骤总数",
-      scenario_total: "场景公共参数",
+      scenario_total: "场景变量",
       api_list_import: "接口列表导入",
       external_import: "外部导入",
       wait_controller: "等待控制器",
@@ -580,6 +646,7 @@ export default {
       customize_req: "自定义请求",
       reference_info: "请选择接口或用例",
       scenario_test: "场景",
+      scenario_list: "场景列表",
       add_scenario: "创建场景",
       scenario_name: "场景名称",
       case_level: "用例等级",
@@ -609,7 +676,8 @@ export default {
         select_principal: "请选择责任人",
         follow_people: "关注人",
         select_table: "选择可见数据",
-        select_all: "选择全部数据"
+        select_all: "选择全部数据",
+        check_case: "请勾选场景用例"
       },
       report_name_info: '请输入报告名称',
       save_case_info: '请先保存用例',
@@ -678,7 +746,7 @@ export default {
       jmeter_func: "Jmeter 方法",
       parameters_filter_example: "示例",
       parameters_filter_tips: "只支持 MockJs 函数结果预览",
-      parameters_advance: "高级参数设置",
+      parameters_advance: "return",
       parameters_preview: "预览",
       parameters_mock_filter_tips: "请输入关键字进行过滤",
       parameters_pre_request: "前置请求提取",
@@ -731,6 +799,7 @@ export default {
         variable_name: "变量名称",
         set_failure_status: "设置失败状态",
         set_failure_msg: "设置失败消息",
+        suggest_tip: "点击便签添加JSONPath断言",
       },
       extract: {
         label: "提取",
@@ -741,6 +810,9 @@ export default {
         regex_expression: "Perl型正则表达式",
         json_path_expression: "JSONPath表达式",
         xpath_expression: "XPath表达式",
+        suggest_tip: "点击便签添加JSONPath提取",
+        json_path_suggest: "推荐JSONPath提取",
+        json_path_clear: "清空JSONPath提取",
       },
       processor: {
         pre_exec_script: "预执行脚本",
@@ -811,8 +883,14 @@ export default {
       swagger_tip: "支持 Swagger 2.0 与 3.0 版本的 json 文件",
       post_export_tip: "通过 Postman 导出测试集合",
       swagger_export_tip: "通过 Swagger 页面导出",
+      jmeter_export_tip: "通过 Jmeter 生成JMX文件",
+      jmeter_tip: "支持 Jmeter 5.2版本的JMX 文件",
       suffixFormatErr: "文件格式不符合要求",
       swagger_url_import: "使用URL导入",
+      timing_synchronization: "定时同步",
+      next_synchronization_time: "下次同步时间"
+
+
     },
     home_page: {
       unit_of_measurement: "个",
@@ -900,12 +978,15 @@ export default {
         table_coloum: {
           index: "序号",
           scenario: "场景名称",
+          task_type: "任务类型",
           run_rule: "运行规则",
           task_status: "任务状态",
           next_execution_time: "下次执行时间",
           create_user: "创建人",
           update_time: "更新时间",
         },
+        scenario_schedule: "场景",
+        test_plan_schedule: "测试计划",
         confirm: {
           close_title: "要关闭这条定时任务吗？",
         }
@@ -960,6 +1041,7 @@ export default {
   },
   test_track: {
     test_track: "测试跟踪",
+    planning_execution: "规划&执行",
     confirm: "确 定",
     cancel: "取 消",
     project: "项目",
@@ -975,6 +1057,7 @@ export default {
     cancel_relevance_success: "取消关联成功",
     switch_project: "切换项目",
     case: {
+      check_select: "请勾选用例",
       export_all_cases: '确定要导出全部用例吗?',
       input_test_case: '请输入关联用例名称',
       test_name: '测试名称',
@@ -1023,9 +1106,9 @@ export default {
       batch_operate: '批量操作',
       please_select_attr: '请选择属性',
       please_select_attr_value: '请选择属性对应的值',
-      batch_edit_case: '批量编辑用例',
-      batch_move_case: '批量移动用例',
-      batch_delete_case: '批量删除用例',
+      batch_edit_case: '批量编辑',
+      batch_move_case: '批量移动',
+      batch_delete_case: '批量删除',
       batch_unlink: '批量取消关联',
       project_name: '所属项目',
       status: '评审状态',
@@ -1068,6 +1151,7 @@ export default {
       plan_name: "计划名称",
       plan_project: "所属项目",
       related_project: "关联项目",
+      related_tip: "关联项目后可以添加关联项目下的测试用例到测试计划列表",
       plan_stage: "测试阶段",
       plan_status: "当前状态",
       smoke_test: "冒烟测试",
@@ -1085,6 +1169,7 @@ export default {
       plan_status_prepare: "未开始",
       plan_status_running: "进行中",
       plan_status_completed: "已完成",
+      plan_status_trash: "废弃",
       planned_start_time: "计划开始",
       planned_end_time: "计划结束",
       actual_start_time: "实际开始",
@@ -1092,6 +1177,19 @@ export default {
       plan_delete_confirm: "将删除该测试计划下所有用例，确认删除测试计划: ",
       plan_delete_tip: "该测试计划正在进行中，请确认再删除！",
       plan_delete: "删除计划",
+      api_case: "接口测试用例",
+      scenario_case: "场景测试用例",
+      load_case: {
+        case: "性能用例",
+        execution_status: "执行状态",
+        report: "报告",
+        view_report: "查看报告",
+        unlink_in_bulk: "批量取消关联",
+        batch_exec_cases: "批量执行用例",
+        exec: "正在执行....",
+        error: "用例执行错误，请单独调试该用例！",
+        report_not_found: "报告不存在",
+      }
     },
     review: {
       test_review: "用例评审",
@@ -1100,6 +1198,8 @@ export default {
       review_name: "评审名称",
       reviewer: "评审人",
       review_project: "所属项目",
+      related_project: "关联项目",
+      related_tip: "关联项目后可以添加关联项目下的测试用例到评审列表",
       review_creator: "发起人",
       review_status: "当前状态",
       end_time: "截止时间",
@@ -1228,6 +1328,22 @@ export default {
       tapd_current_owner: "Tapd bug 处理人：",
       zentao_bug_build: "禅道 bug 影响版本",
       zentao_bug_assigned: "禅道 bug 处理人",
+    },
+    report: {
+      name: "测试计划报告",
+      list: {
+        name: "名称",
+        test_plan: "测试计划名称",
+        creator: "创建人",
+        create_time: "创建时间",
+        trigger_mode: "触发方式",
+        status: "状态",
+        operation: "操作",
+      },
+      trigger_mode: {
+        manual: "手动触发",
+        automation: "自动触发",
+      },
     }
   },
   test_resource_pool: {
@@ -1247,6 +1363,7 @@ export default {
     status_change_success: '状态修改成功!',
     status_change_failed: '状态修改失败, 校验不通过!',
     check_in: '校验中',
+    node_selector_invalid: 'nodeSelector 必须是有效的JSON'
   },
   system_parameter_setting: {
     mailbox_service_settings: '邮件设置',
@@ -1425,5 +1542,21 @@ export default {
     interval: "循环间隔",
     proceed: "成功后继续循环",
     timeout: "循环超时时间",
+  },
+  variables: {
+    cvs_info: "只能上传CSV文件",
+    end: "结束",
+    start: "开始",
+    increment: "增量",
+    counter_info: "000产生至少3位数字。user_000输出形式为user_nnn",
+    config: "配置",
+    add_file: "添加文件",
+    delimiter: "分隔符",
+    format: "输出格式",
+  },
+  auth_source: {
+    delete_prompt: '此操作会删除认证源，是否继续？',
+    title: '认证设置',
+    auth_name_valid: '名称不支持特殊字符',
   }
 };

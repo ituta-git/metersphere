@@ -18,12 +18,12 @@
   <select id="list" resultType="io.metersphere.api.dto.definition.TestPlanApiCaseDTO">
     select
       t.id, t.environment_id, t.create_time, t.update_time,
-      c.id as case_id, c.project_id, c.name, c.api_definition_id, c.priority, c.description, c.create_user_id, c.update_user_id, c.num,
+      c.id as case_id, c.project_id, c.name, c.api_definition_id, c.priority, c.description, c.create_user_id, c.update_user_id, c.num, c.tags,
       a.module_id, a.path, a.protocol, t.status execResult
     from
       test_plan_api_case t
     inner join
-      api_test_case c
+    api_test_case c
     on t.api_case_id = c.id
       <if test="request.planId != null and request.planId!=''">
         and t.test_plan_id = #{request.planId}
@@ -39,8 +39,17 @@
       <when test="request.status == 'Trash'">
         and a.status = 'Trash'
       </when>
-      <otherwise>
+      <when test="request.status == null">
         and a.status != 'Trash'
+      </when>
+      <when test="request.status == ''">
+        and a.status != 'Trash'
+      </when>
+      <when test="request.status == 'running'">
+        and t.status IS NULL
+      </when>
+      <otherwise>
+        and t.status = #{request.status}
       </otherwise>
     </choose>
     where 1
@@ -54,7 +63,7 @@
       </foreach>
     </if>
     <if test="request.name != null and request.name!=''">
-      and c.name like CONCAT('%', #{request.name},'%')
+      and (c.name like CONCAT('%', #{request.name},'%') or c.tags like CONCAT('%', #{request.name},'%'))
     </if>
     <if test="request.moduleIds != null and request.moduleIds.size() > 0">
       and a.module_id in
@@ -72,6 +81,12 @@
                 #{value}
               </foreach>
             </when>
+            <when test="key == 'user_id'">
+              and c.create_user_id in
+              <foreach collection="values" item="value" separator="," open="(" close=")">
+                #{value}
+              </foreach>
+            </when>
           </choose>
         </if>
       </foreach>
@@ -82,6 +97,9 @@
         <choose>
           <when test="order.name == 'update_time'">
             t.${order.name} ${order.type}
+          </when>
+          <when test="order.name == 'create_user'">
+            create_user_id ${order.type}
           </when>
           <otherwise>
             ${order.name} ${order.type}
@@ -115,6 +133,9 @@
         </foreach>
       </if>
     where t.test_plan_id = #{planId}
+  </select>
+  <select id="getStatusByTestPlanId" resultType="java.lang.String">
+    SELECT `status` FROM test_plan_api_case WHERE test_plan_id = #{0}
   </select>
 
 </mapper>

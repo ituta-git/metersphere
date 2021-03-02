@@ -14,6 +14,10 @@
                 </div>
               </span>
               </el-tooltip>
+              <el-row>
+                <el-link class="ms-el-link" @click="batchAdd" style="color: #783887"> {{$t("commons.batch_add")}}</el-link>
+              </el-row>
+
               <ms-api-key-value :is-read-only="isReadOnly" :isShowEnable="isShowEnable" :suggestions="headerSuggestions" :items="headers"/>
             </el-tab-pane>
 
@@ -26,7 +30,7 @@
                 </div></span>
               </el-tooltip>
               <el-row>
-                <el-link class="ms-el-link" @click="batchAdd"> {{$t("commons.batch_add")}}</el-link>
+                <el-link class="ms-el-link" @click="batchAdd" style="color: #783887"> {{$t("commons.batch_add")}}</el-link>
               </el-row>
               <ms-api-variable :is-read-only="isReadOnly" :isShowEnable="isShowEnable" :parameters="request.arguments"/>
             </el-tab-pane>
@@ -42,7 +46,7 @@
               </span>
               </el-tooltip>
               <el-row>
-                <el-link class="ms-el-link" @click="batchAdd"> {{$t("commons.batch_add")}}</el-link>
+                <el-link class="ms-el-link" @click="batchAdd" style="color: #783887"> {{$t("commons.batch_add")}}</el-link>
               </el-row>
               <ms-api-variable :is-read-only="isReadOnly" :isShowEnable="isShowEnable" :parameters="request.rest"/>
             </el-tab-pane>
@@ -67,33 +71,9 @@
 
           </el-tabs>
         </div>
-        <div v-if="!referenced">
-          <div v-for="row in request.hashTree" :key="row.id">
-            <!-- 前置脚本 -->
-            <ms-jsr233-processor v-if="row.label ==='JSR223 PreProcessor'" @copyRow="copyRow" @remove="remove" :is-read-only="false" :title="$t('api_test.definition.request.pre_script')" style-type="color: #B8741A;background-color: #F9F1EA"
-                                 :jsr223-processor="row"/>
-            <!--后置脚本-->
-            <ms-jsr233-processor v-if="row.label ==='JSR223 PostProcessor'" @copyRow="copyRow" @remove="remove" :is-read-only="false" :title="$t('api_test.definition.request.post_script')" style-type="color: #783887;background-color: #F2ECF3"
-                                 :jsr223-processor="row"/>
-            <!--断言规则-->
-            <ms-api-assertions v-if="row.type==='Assertions'" @copyRow="copyRow" @remove="remove" :is-read-only="isReadOnly" :assertions="row"/>
-            <!--提取规则-->
-            <ms-api-extract :is-read-only="isReadOnly" @copyRow="copyRow" @remove="remove" v-if="row.type==='Extract'" :extract="row"/>
-          </div>
-
-
-        </div>
       </el-col>
       <!--操作按钮-->
-      <el-col :span="3" class="ms-left-cell" v-if="!referenced && showScript">
-        <el-button class="ms-left-buttion" size="small" @click="addPre">+{{$t('api_test.definition.request.pre_script')}}</el-button>
-        <br/>
-        <el-button class="ms-left-buttion" size="small" @click="addPost">+{{$t('api_test.definition.request.post_script')}}</el-button>
-        <br/>
-        <el-button class="ms-left-buttion" size="small" @click="addAssertions">+{{$t('api_test.definition.request.assertions_rule')}}</el-button>
-        <br/>
-        <el-button class="ms-left-buttion" size="small" @click="addExtract">+{{$t('api_test.definition.request.extract_param')}}</el-button>
-      </el-col>
+      <api-definition-step-button :request="request" v-if="!referenced && showScript"/>
     </el-row>
     <batch-add-parameter @batchSave="batchSave" ref="batchAddParameter"/>
   </div>
@@ -106,18 +86,19 @@
   import ApiRequestMethodSelect from "../../collapse/ApiRequestMethodSelect";
   import {REQUEST_HEADERS} from "@/common/js/constants";
   import MsApiVariable from "../../ApiVariable";
-  import MsJsr233Processor from "../../processor/Jsr233Processor";
-  import {createComponent} from "../../jmeter/components";
   import MsApiAssertions from "../../assertion/ApiAssertions";
   import MsApiExtract from "../../extract/ApiExtract";
-  import {Assertions, Body, Extract, KeyValue} from "../../../model/ApiTestModel";
+  import {Body, KeyValue} from "../../../model/ApiTestModel";
   import {getUUID} from "@/common/js/utils";
   import BatchAddParameter from "../../basis/BatchAddParameter";
   import MsApiAdvancedConfig from "./ApiAdvancedConfig";
+  import MsJsr233Processor from "../../../../automation/scenario/component/Jsr233Processor";
+  import ApiDefinitionStepButton from "../components/ApiDefinitionStepButton";
 
   export default {
     name: "MsApiHttpRequestForm",
     components: {
+      ApiDefinitionStepButton,
       MsJsr233Processor,
       MsApiAdvancedConfig,
       BatchAddParameter,
@@ -131,14 +112,21 @@
     },
     props: {
       request: {},
-      showScript: Boolean,
+      response: {},
+      showScript: {
+        type: Boolean,
+        default: true,
+      },
       headers: {
         type: Array,
         default() {
           return [];
         }
       },
-      referenced: Boolean,
+      referenced: {
+        type: Boolean,
+        default: false,
+      },
       isShowEnable: Boolean,
       jsonPathList: Array,
       isReadOnly: {
@@ -181,26 +169,6 @@
     },
 
     methods: {
-      addPre() {
-        let jsr223PreProcessor = createComponent("JSR223PreProcessor");
-        this.request.hashTree.push(jsr223PreProcessor);
-        this.reload();
-      },
-      addPost() {
-        let jsr223PostProcessor = createComponent("JSR223PostProcessor");
-        this.request.hashTree.push(jsr223PostProcessor);
-        this.reload();
-      },
-      addAssertions() {
-        let assertions = new Assertions();
-        this.request.hashTree.push(assertions);
-        this.reload();
-      },
-      addExtract() {
-        let jsonPostProcessor = new Extract();
-        this.request.hashTree.push(jsonPostProcessor);
-        this.reload();
-      },
       remove(row) {
         let index = this.request.hashTree.indexOf(row);
         this.request.hashTree.splice(index, 1);
@@ -262,6 +230,9 @@
               case "rest":
                 this.request.rest.unshift(item);
                 break;
+              case "headers":
+                this.request.headers.unshift(item);
+                break;
               default:
                 break;
             }
@@ -273,13 +244,6 @@
 </script>
 
 <style scoped>
-  .ms-left-cell {
-    margin-top: 30px;
-  }
-
-  .ms-left-buttion {
-    margin: 6px 0px 8px 30px;
-  }
 
   .ms-query {
     background: #783887;
@@ -298,30 +262,6 @@
   .request-tabs {
     margin: 20px;
     min-height: 200px;
-  }
-
-  .ms-left-cell .el-button:nth-of-type(1) {
-    color: #B8741A;
-    background-color: #F9F1EA;
-    border: #F9F1EA;
-  }
-
-  .ms-left-cell .el-button:nth-of-type(2) {
-    color: #783887;
-    background-color: #F2ECF3;
-    border: #F2ECF3;
-  }
-
-  .ms-left-cell .el-button:nth-of-type(3) {
-    color: #A30014;
-    background-color: #F7E6E9;
-    border: #F7E6E9;
-  }
-
-  .ms-left-cell .el-button:nth-of-type(4) {
-    color: #015478;
-    background-color: #E6EEF2;
-    border: #E6EEF2;
   }
 
   .ms-el-link {

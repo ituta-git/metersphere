@@ -12,30 +12,30 @@
 
     <ms-main-container>
       <test-case-list
+        :module-options="moduleOptions"
         :select-node-ids="selectNodeIds"
         :select-parent-nodes="selectParentNodes"
+        :tree-nodes="treeNodes"
         @testCaseEdit="editTestCase"
         @testCaseCopy="copyTestCase"
         @testCaseDetail="showTestCaseDetail"
-        @batchMove="batchMove"
         @refresh="refresh"
         @refreshAll="refreshAll"
-        @moveToNode="moveToNode"
+        @setCondition="setCondition"
         ref="testCaseList">
       </test-case-list>
     </ms-main-container>
 
     <test-case-edit
       @refresh="refreshTable"
+      @setModuleOptions="setModuleOptions"
       :read-only="testCaseReadOnly"
       :tree-nodes="treeNodes"
       :select-node="selectNode"
+      :select-condition="condition"
       ref="testCaseEditDialog">
     </test-case-edit>
 
-    <test-case-move @refresh="refresh" ref="testCaseMove"/>
-
-    <batch-move @refresh="refresh" ref="testBatchMove"/>
 
   </ms-container>
 
@@ -47,20 +47,19 @@ import NodeTree from '../common/NodeTree';
 import TestCaseEdit from './components/TestCaseEdit';
 import TestCaseList from "./components/TestCaseList";
 import SelectMenu from "../common/SelectMenu";
-import TestCaseMove from "./components/TestCaseMove";
 import MsContainer from "../../common/components/MsContainer";
 import MsAsideContainer from "../../common/components/MsAsideContainer";
 import MsMainContainer from "../../common/components/MsMainContainer";
 import {checkoutTestManagerOrTestUser, getCurrentProjectID, hasRoles} from "../../../../common/js/utils";
-import BatchMove from "./components/BatchMove";
 import TestCaseNodeTree from "../common/TestCaseNodeTree";
+import {TrackEvent,LIST_CHANGE} from "@/business/components/common/head/ListEvent";
 
 export default {
   name: "TestCase",
   components: {
     TestCaseNodeTree,
     MsMainContainer,
-    MsAsideContainer, MsContainer, TestCaseMove, TestCaseList, NodeTree, TestCaseEdit, SelectMenu, BatchMove
+    MsAsideContainer, MsContainer, TestCaseList, NodeTree, TestCaseEdit, SelectMenu
   },
   comments: {},
   data() {
@@ -72,6 +71,8 @@ export default {
       selectParentNodes: [],
       testCaseReadOnly: true,
       selectNode: {},
+      condition: {},
+      moduleOptions: []
     }
   },
   mounted() {
@@ -149,20 +150,14 @@ export default {
         this.$refs.testCaseEditDialog.open();
       }
     },
-
-    moveToNode(selectIds) {
-      if (selectIds.size < 1) {
-        this.$warning(this.$t('test_track.plan_view.select_manipulate'));
-        return;
-      }
-      this.$refs.testCaseEditDialog.getModuleOptions();
-      this.$refs.testCaseMove.open(this.$refs.testCaseEditDialog.moduleOptions, selectIds);
-    },
-    batchMove(selectIds) {
-      this.$refs.testBatchMove.open(this.treeNodes, selectIds, this.$refs.testCaseEditDialog.moduleOptions);
-    },
     setTreeNodes(data) {
       this.treeNodes = data;
+    },
+    setCondition(data) {
+      this.condition = data;
+    },
+    setModuleOptions(data) {
+      this.moduleOptions = data;
     }
   }
 }

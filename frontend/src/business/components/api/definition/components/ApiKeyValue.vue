@@ -1,16 +1,21 @@
 <template>
-  <div>
+  <div v-loading="loading">
     <span class="kv-description" v-if="description">
       {{ description }}
     </span>
-    <div class="kv-row" v-for="(item, index) in items" :key="index">
+    <div class="kv-row item" v-for="(item, index) in items" :key="index">
       <el-row type="flex" :gutter="20" justify="space-between" align="middle">
         <el-col class="kv-checkbox" v-if="isShowEnable">
           <input type="checkbox" v-if="!isDisable(index)" v-model="item.enable"
                  :disabled="isReadOnly"/>
-        </el-col>
 
-        <el-col>
+        </el-col>
+        <span style="margin-left: 10px" v-else></span>
+
+        <i class="el-icon-top" style="cursor:pointer" @click="moveTop(index)"/>
+        <i class="el-icon-bottom" style="cursor:pointer;" @click="moveBottom(index)"/>
+
+        <el-col class="item">
           <el-input v-if="!suggestions" :disabled="isReadOnly" v-model="item.name" size="small" maxlength="200"
                     @change="change"
                     :placeholder="keyText" show-word-limit/>
@@ -20,11 +25,11 @@
 
         </el-col>
 
-        <el-col>
+        <el-col class="item">
           <el-input :disabled="isReadOnly" v-model="item.value" size="small" @change="change"
                     :placeholder="valueText" show-word-limit/>
         </el-col>
-        <el-col class="kv-delete">
+        <el-col class="item kv-delete">
           <el-button size="mini" class="el-icon-delete-solid" circle @click="remove(index)"
                      :disabled="isDisable(index) || isReadOnly"/>
         </el-col>
@@ -35,10 +40,11 @@
 
 <script>
   import {KeyValue} from "../model/ApiTestModel";
+  import Vue from 'vue';
+
 
   export default {
     name: "MsApiKeyValue",
-
     props: {
       keyPlaceholder: String,
       valuePlaceholder: String,
@@ -55,7 +61,10 @@
       suggestions: Array,
     },
     data() {
-      return {}
+      return {
+        keyValues: [],
+        loading: false,
+      }
     },
     computed: {
       keyText() {
@@ -67,6 +76,31 @@
     },
 
     methods: {
+      moveBottom(index) {
+        if (this.items.length < 2 || index === this.items.length - 2) {
+          return;
+        }
+        let thisRow = this.items[index];
+        let nextRow = this.items[index + 1];
+        Vue.set(this.items, index + 1, thisRow);
+        Vue.set(this.items, index, nextRow)
+      },
+      moveTop(index) {
+        if (index === 0) {
+          return;
+        }
+        let thisRow = this.items[index];
+        let lastRow = this.items[index - 1];
+        Vue.set(this.items, index - 1, thisRow);
+        Vue.set(this.items, index, lastRow)
+
+      },
+      reload() {
+        this.loading = true
+        this.$nextTick(() => {
+          this.loading = false
+        })
+      },
       remove: function (index) {
         // 移除整行输入控件及内容
         this.items.splice(index, 1);
@@ -133,5 +167,9 @@
 
   .el-autocomplete {
     width: 100%;
+  }
+
+  i:hover {
+    color: #783887;
   }
 </style>

@@ -20,32 +20,15 @@
 
                   <el-row type="flex" class="head-bar">
 
-                    <el-col :span="12">
+                    <el-col :span="4">
                       <el-button plain size="mini"
                                  icon="el-icon-back"
                                  @click="cancel">{{ $t('test_track.return') }}
                       </el-button>
                     </el-col>
 
-                    <el-col :span="11" class="head-right">
-                <span class="head-right-tip" v-if="index + 1 === testCases.length">
-                  {{ $t('test_track.plan_view.pre_case') }} : {{
-                    testCases[index - 1] ? testCases[index - 1].name : ''
-                  }}
-                </span>
-                      <span class="head-right-tip" v-if="index + 1 !== testCases.length">
-                  {{ $t('test_track.plan_view.next_case') }} : {{
-                          testCases[index + 1] ? testCases[index + 1].name : ''
-                        }}
-                </span>
-
-                      <el-button plain size="mini" icon="el-icon-arrow-up"
-                                 :disabled="index + 1 <= 1"
-                                 @click="handlePre()"/>
-                      <span>  {{ index + 1 }}/{{ testCases.length }} </span>
-                      <el-button plain size="mini" icon="el-icon-arrow-down"
-                                 :disabled="index + 1 >= testCases.length"
-                                 @click="handleNext()"/>
+                    <el-col class="head-right" :span="20">
+                      <ms-previous-next-button :index="index" @pre="handlePre" @next="handleNext" :list="testCases"/>
                     </el-col>
 
                   </el-row>
@@ -274,9 +257,10 @@
                         <el-table-column prop="description" :label="$t('test_track.issue.description')">
                           <template v-slot:default="scope">
                             <el-popover
-                              placement="left"
-                              width="400"
+                              placement="right"
+                              width="500"
                               trigger="hover"
+                              popper-class="issues-popover"
                             >
                               <ckeditor :editor="editor" disabled :config="readConfig"
                                         v-model="scope.row.description"/>
@@ -370,10 +354,12 @@ import PerformanceTestResult from "../test/PerformanceTestResult";
 import {listenGoBack, removeGoBackListener} from "@/common/js/utils";
 import TestCaseAttachment from "@/business/components/track/case/components/TestCaseAttachment";
 import CaseComment from "@/business/components/track/case/components/CaseComment";
+import MsPreviousNextButton from "../../../../../common/components/MsPreviousNextButton";
 
 export default {
   name: "FunctionalTestCaseEdit",
   components: {
+    MsPreviousNextButton,
     CaseComment,
     PerformanceTestResult,
     PerformanceTestDetail,
@@ -722,10 +708,6 @@ export default {
   float: right;
 }
 
-.head-right-tip {
-  color: darkgrey;
-}
-
 .el-scrollbar {
   height: 100%;
 }
@@ -761,5 +743,16 @@ export default {
 p {
   white-space: pre-line;
   line-height: 20px;
+}
+
+.head-bar {
+  z-index: 999;
+}
+</style>
+
+<style>
+.issues-popover {
+  height: 550px;
+  overflow: auto;
 }
 </style>

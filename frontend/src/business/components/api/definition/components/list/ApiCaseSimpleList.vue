@@ -1,139 +1,208 @@
 <template>
   <div>
-    <api-list-container
+    <api-list-container-with-doc
       :is-api-list-enable="isApiListEnable"
+      :active-dom="activeDom"
+      @activeDomChange="activeDomChange"
       @isApiListEnableChange="isApiListEnableChange">
+      <el-link type="primary" style="float:right;margin-top: 5px" @click="open">{{$t('commons.adv_search.title')}}</el-link>
 
-      <el-input placeholder="搜索" @blur="search" @keyup.enter.native="search" class="search-input" size="small" v-model="condition.name"/>
+      <el-input :placeholder="$t('commons.search_by_id_name_tag')" @blur="search" @keyup.enter.native="search" class="search-input" size="small"
+                v-model="condition.name"/>
 
       <el-table v-loading="result.loading"
                 ref="caseTable"
                 border
-                :data="tableData" row-key="id" class="test-content adjust-table"
+                :data="tableData" row-key="id" class="test-content adjust-table ms-select-all-fixed"
                 @select-all="handleSelectAll"
                 @filter-change="filter"
                 @sort-change="sort"
+                @header-dragend="headerDragend"
                 @select="handleSelect" :height="screenHeight">
-        <el-table-column type="selection"/>
-        <el-table-column width="40" :resizable="false" align="center">
-          <el-dropdown slot="header" style="width: 14px">
-            <span class="el-dropdown-link" style="width: 14px">
-              <i class="el-icon-arrow-down el-icon--right" style="margin-left: 0px"></i>
-            </span>
-            <el-dropdown-menu slot="dropdown">
-              <el-dropdown-item @click.native.stop="isSelectDataAll(true)">
-                {{$t('api_test.batch_menus.select_all_data',[total])}}
-              </el-dropdown-item>
-              <el-dropdown-item @click.native.stop="isSelectDataAll(false)">
-                {{$t('api_test.batch_menus.select_show_data',[tableData.length])}}
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </el-dropdown>
+
+        <el-table-column type="selection" width="50"/>
+
+        <ms-table-header-select-popover v-show="total>0"
+                                        :page-size="pageSize>total?total:pageSize"
+                                        :total="total"
+                                        @selectPageAll="isSelectDataAll(false)"
+                                        @selectAll="isSelectDataAll(true)"/>
+
+        <el-table-column width="30" :resizable="false" min-width="30px" align="center">
           <template v-slot:default="scope">
-            <show-more-btn :is-show="scope.row.showMore && !isReadOnly" :buttons="buttons" :size="selectDataCounts"/>
+            <show-more-btn :is-show="scope.row.showMore" :buttons="buttons" :size="selectDataCounts"/>
           </template>
         </el-table-column>
+        <template v-for="(item, index) in tableLabel">
+          <el-table-column v-if="item.id == 'num'" prop="num" label="ID" min-width="120px" show-overflow-tooltip
+                           :key="index">
+            <template slot-scope="scope">
+              <el-tooltip content="编辑">
+                <a style="cursor:pointer" @click="handleTestCase(scope.row)"> {{ scope.row.num }} </a>
+              </el-tooltip>
+            </template>
+          </el-table-column>
 
-        <el-table-column prop="num" label="ID" show-overflow-tooltip/>
-        <el-table-column prop="name" :label="$t('test_track.case.name')" show-overflow-tooltip/>
+          <el-table-column v-if="item.id == 'name'" prop="name" min-width="160px" :label="$t('test_track.case.name')"
+                           show-overflow-tooltip :key="index"/>
 
-        <el-table-column
-          prop="priority"
-          :filters="priorityFilters"
-          column-key="priority"
-          :label="$t('test_track.case.priority')"
-          show-overflow-tooltip>
+          <el-table-column
+            v-if="item.id == 'priority'"
+            prop="priority"
+            :filters="priorityFilters"
+            column-key="priority"
+            min-width="120px"
+            :label="$t('test_track.case.priority')"
+            show-overflow-tooltip
+            :key="index">
+            <template v-slot:default="scope">
+              <priority-table-item :value="scope.row.priority"/>
+            </template>
+          </el-table-column>
+
+          <el-table-column
+            v-if="item.id == 'custom'"
+            sortable="custom"
+            prop="path"
+            min-width="180px"
+            :label="$t('api_test.definition.api_path')"
+            show-overflow-tooltip
+            :key="index"/>
+
+          <el-table-column v-if="item.id=='tags'" prop="tags" min-width="120px" :label="$t('commons.tag')"
+                           :key="index">
+            <template v-slot:default="scope">
+                <ms-tag  v-for="(itemName,index)  in scope.row.tags" :key="index" type="success" effect="plain" :content="itemName" style="margin-left: 5px"/>
+            </template>
+          </el-table-column>
+
+          <el-table-column
+            v-if="item.id=='createUser'"
+            prop="createUser"
+            :label="'创建人'"
+            show-overflow-tooltip
+            :key="index"/>
+
+          <el-table-column
+            v-if="item.id=='custom'"
+            sortable="custom"
+            min-width="160"
+            :label="$t('api_test.definition.api_last_time')"
+            prop="updateTime"
+            :key="index">
+            <template v-slot:default="scope">
+              <span>{{ scope.row.updateTime | timestampFormatDate }}</span>
+            </template>
+          </el-table-column>
+        </template>
+        <el-table-column fixed="right" v-if="!isReadOnly" :label="$t('commons.operating')" min-width="130"
+                         align="center">
+          <template slot="header">
+            <header-label-operate @exec="customHeader"/>
+          </template>
           <template v-slot:default="scope">
-            <priority-table-item :value="scope.row.priority"/>
+            <ms-table-operator-button :tip="$t('commons.edit')" icon="el-icon-edit" @exec="handleTestCase(scope.row)"
+                                      v-tester/>
+            <ms-table-operator-button :tip="$t('commons.delete')" icon="el-icon-delete" @exec="handleDelete(scope.row)"
+                                      type="danger" v-tester/>
+            <ms-api-case-table-extend-btns @showCaseRef="showCaseRef" @showEnvironment="showEnvironment"
+                                           @createPerformance="createPerformance" :row="scope.row" v-tester/>
           </template>
         </el-table-column>
-
-        <el-table-column
-          sortable="custom"
-          prop="path"
-          :label="$t('api_test.definition.api_path')"
-          show-overflow-tooltip/>
-
-        <el-table-column
-          prop="createUser"
-          :label="'创建人'"
-          show-overflow-tooltip/>
-
-        <el-table-column
-          sortable="custom"
-          width="160"
-          :label="$t('api_test.definition.api_last_time')"
-          prop="updateTime">
-          <template v-slot:default="scope">
-            <span>{{ scope.row.updateTime | timestampFormatDate }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column v-if="!isReadOnly" :label="$t('commons.operating')" min-width="130" align="center">
-          <template v-slot:default="scope">
-            <!--<el-button type="text" @click="reductionApi(scope.row)" v-if="trashEnable">{{$t('commons.reduction')}}</el-button>-->
-            <el-button type="text" @click="handleTestCase(scope.row)" v-if="!trashEnable">{{$t('commons.edit')}}</el-button>
-            <el-button type="text" @click="handleDelete(scope.row)" style="color: #F56C6C">{{$t('commons.delete')}}</el-button>
-          </template>
-        </el-table-column>
-
       </el-table>
+      <header-custom ref="headerCustom" :initTableData="initTable" :optionalFields=headerItems
+                     :type=type></header-custom>
       <ms-table-pagination :change="initTable" :current-page.sync="currentPage" :page-size.sync="pageSize"
                            :total="total"/>
-    </api-list-container>
+    </api-list-container-with-doc>
 
     <api-case-list @showExecResult="showExecResult" @refresh="initTable" :currentApi="selectCase" ref="caseList"/>
     <!--批量编辑-->
     <ms-batch-edit ref="batchEdit" @batchEdit="batchEdit" :typeArr="typeArr" :value-arr="valueArr"/>
+    <!--选择环境(当创建性能测试的时候)-->
+    <ms-set-environment ref="setEnvironment" :testCase="clickRow" @createPerformance="createPerformance"/>
+    <!--查看引用-->
+    <ms-reference-view ref="viewRef"/>
+    <!--高级搜索-->
+    <ms-table-adv-search-bar :condition.sync="condition" :showLink="false" ref="searchBar" @search="initTable"/>
+
   </div>
 
 </template>
 
 <script>
 
-  import MsTableOperator from "../../../../common/components/MsTableOperator";
-  import MsTableOperatorButton from "../../../../common/components/MsTableOperatorButton";
-  import {LIST_CHANGE, TrackEvent} from "@/business/components/common/head/ListEvent";
-  import MsTablePagination from "../../../../common/pagination/TablePagination";
-  import MsTag from "../../../../common/components/MsTag";
-  import MsApiCaseList from "../case/ApiCaseList";
-  import MsContainer from "../../../../common/components/MsContainer";
-  import MsBottomContainer from "../BottomContainer";
-  import ShowMoreBtn from "../../../../track/case/components/ShowMoreBtn";
-  import MsBatchEdit from "../basis/BatchEdit";
-  import {API_METHOD_COLOUR, CASE_PRIORITY, REQ_METHOD} from "../../model/JsonData";
-  import {getCurrentProjectID} from "@/common/js/utils";
-  import ApiListContainer from "./ApiListContainer";
-  import PriorityTableItem from "../../../../track/common/tableItems/planview/PriorityTableItem";
-  import ApiCaseList from "../case/ApiCaseList";
-  import {_filter, _sort} from "../../../../../../common/js/utils";
-  import {_handleSelect, _handleSelectAll} from "../../../../../../common/js/tableUtils";
+import MsTableOperator from "../../../../common/components/MsTableOperator";
+import MsTableOperatorButton from "../../../../common/components/MsTableOperatorButton";
+import MsTablePagination from "../../../../common/pagination/TablePagination";
+import MsTag from "../../../../common/components/MsTag";
+import MsApiCaseList from "../case/ApiCaseList";
+import ApiCaseList from "../case/ApiCaseList";
+import MsContainer from "../../../../common/components/MsContainer";
+import MsBottomContainer from "../BottomContainer";
+import ShowMoreBtn from "../../../../track/case/components/ShowMoreBtn";
+import MsBatchEdit from "../basis/BatchEdit";
+import {API_METHOD_COLOUR, CASE_PRIORITY, DUBBO_METHOD, REQ_METHOD, SQL_METHOD, TCP_METHOD} from "../../model/JsonData";
 
-  export default {
-    name: "ApiCaseSimpleList",
-    components: {
-      ApiCaseList,
-      PriorityTableItem,
-      ApiListContainer,
-      MsTableOperatorButton,
-      MsTableOperator,
-      MsTablePagination,
-      MsTag,
-      MsApiCaseList,
-      MsContainer,
-      MsBottomContainer,
-      ShowMoreBtn,
-      MsBatchEdit
+import {getBodyUploadFiles, getCurrentProjectID, getCurrentUser} from "@/common/js/utils";
+import ApiListContainer from "./ApiListContainer";
+// import ApiListContainer from "./ApiListContainer";
+import ApiListContainerWithDoc from "@/business/components/api/definition/components/list/ApiListContainerWithDoc";
+import PriorityTableItem from "../../../../track/common/tableItems/planview/PriorityTableItem";
+import MsApiCaseTableExtendBtns from "../reference/ApiCaseTableExtendBtns";
+import MsReferenceView from "../reference/ReferenceView";
+import MsSetEnvironment from "@/business/components/api/definition/components/basis/SetEnvironment";
+import TestPlan from "@/business/components/api/definition/components/jmeter/components/test-plan";
+import ThreadGroup from "@/business/components/api/definition/components/jmeter/components/thread-group";
+import {parseEnvironment} from "@/business/components/api/test/model/EnvironmentModel";
+import MsTableHeaderSelectPopover from "@/business/components/common/components/table/MsTableHeaderSelectPopover";
+import MsTableAdvSearchBar from "@/business/components/common/components/search/MsTableAdvSearchBar";
+import {API_CASE_CONFIGS} from "@/business/components/common/components/search/search-components";
+import {_filter, _handleSelect, _handleSelectAll, _sort, getLabel,} from "@/common/js/tableUtils";
+import {API_CASE_LIST, API_LIST, API_SCENARIO_LIST, TEST_CASE_LIST} from "@/common/js/constants";
+import {Api_Case_List, Api_List, Track_Test_Case} from "@/business/components/common/model/JsonData";
+import HeaderCustom from "@/business/components/common/head/HeaderCustom";
+import HeaderLabelOperate from "@/business/components/common/head/HeaderLabelOperate";
+
+export default {
+  name: "ApiCaseSimpleList",
+  components: {
+    HeaderLabelOperate,
+    ApiListContainerWithDoc,
+    HeaderCustom,
+    MsTableHeaderSelectPopover,
+    MsSetEnvironment,
+    ApiCaseList,
+    PriorityTableItem,
+    ApiListContainer,
+    MsTableOperatorButton,
+    MsTableOperator,
+    MsTablePagination,
+    MsTag,
+    MsApiCaseList,
+    MsContainer,
+    MsBottomContainer,
+    ShowMoreBtn,
+    MsBatchEdit,
+    MsApiCaseTableExtendBtns,
+      MsReferenceView,
+      MsTableAdvSearchBar
     },
     data() {
       return {
-        condition: {},
+        type: API_CASE_LIST,
+        headerItems: Api_Case_List,
+        tableLabel: Api_Case_List,
+        condition: {
+          components: API_CASE_CONFIGS
+        },
         selectCase: {},
         result: {},
         moduleId: "",
         selectDataRange: "all",
         deletePath: "/test/case/delete",
         selectRows: new Set(),
+        clickRow: {},
         buttons: [
           {name: this.$t('api_test.definition.request.batch_delete'), handleClick: this.handleDeleteBatch},
           {name: this.$t('api_test.definition.request.batch_edit'), handleClick: this.handleEditBatch}
@@ -163,11 +232,13 @@
         selectAll: false,
         unSelection: [],
         selectDataCounts: 0,
+        environments: [],
       }
     },
     props: {
       currentProtocol: String,
       selectNodeIds: Array,
+      activeDom: String,
       visible: {
         type: Boolean,
         default: false,
@@ -224,10 +295,17 @@
       },
     },
     methods: {
+      customHeader() {
+        this.$refs.headerCustom.open(this.tableLabel)
+      },
       isApiListEnableChange(data) {
         this.$emit('isApiListEnableChange', data);
       },
+      activeDomChange(tabType) {
+        this.$emit("activeDomChange", tabType);
+      },
       initTable() {
+        getLabel(this, API_CASE_LIST);
         this.selectRows = new Set();
         this.condition.status = "";
         this.condition.moduleIds = this.selectNodeIds;
@@ -240,69 +318,71 @@
         this.selectDataCounts = 0;
         this.condition.projectId = getCurrentProjectID();
 
-      if (this.currentProtocol != null) {
-        this.condition.protocol = this.currentProtocol;
-      }
-
-      //检查是否只查询本周数据
-      this.isSelectThissWeekData();
-      this.condition.selectThisWeedData = false;
-      this.condition.id = null;
-      if (this.selectDataRange == 'thisWeekCount') {
-        this.condition.selectThisWeedData = true;
-      } else if (this.selectDataRange != null) {
-        let selectParamArr = this.selectDataRange.split("single:");
-
-        if (selectParamArr.length == 2) {
-          this.condition.id = selectParamArr[1];
+        if (this.currentProtocol != null) {
+          this.condition.protocol = this.currentProtocol;
         }
-      }
 
-      if (this.condition.projectId) {
-        this.result = this.$post('/api/testcase/list/' + this.currentPage + "/" + this.pageSize, this.condition, response => {
-          this.total = response.data.itemCount;
-          this.tableData = response.data.listObject;
-          this.unSelection = response.data.listObject.map(s => s.id);
-        });
-      }
-    },
-    // getMaintainerOptions() {
-    //   let workspaceId = localStorage.getItem(WORKSPACE_ID);
-    //   this.$post('/user/ws/member/tester/list', {workspaceId: workspaceId}, response => {
-    //     this.valueArr.userId = response.data;
-    //   });
-    // },
-    handleSelect(selection, row) {
-      _handleSelect(this, selection, row, this.selectRows);
-      this.selectRowsCount(this.selectRows)
-    },
-    showExecResult(row) {
-      this.visible = false;
-      this.$emit('showExecResult', row);
-    },
-    filter(filters) {
-      _filter(filters, this.condition);
-      this.initTable();
-    },
-    sort(column) {
-      // 每次只对一个字段排序
-      if (this.condition.orders) {
-        this.condition.orders = [];
-      }
-      _sort(column, this.condition);
-      this.initTable();
-    },
-    handleSelectAll(selection) {
-      _handleSelectAll(this, selection, this.tableData, this.selectRows);
-      this.selectRowsCount(this.selectRows)
-    },
-    search() {
-      this.changeSelectDataRangeAll();
-      this.initTable();
-    },
-    buildPagePath(path) {
-      return path + "/" + this.currentPage + "/" + this.pageSize;
-    },
+        //检查是否只查询本周数据
+        this.isSelectThissWeekData();
+        this.condition.selectThisWeedData = false;
+        this.condition.id = null;
+        if (this.selectDataRange == 'thisWeekCount') {
+          this.condition.selectThisWeedData = true;
+        } else if (this.selectDataRange != null) {
+          let selectParamArr = this.selectDataRange.split("single:");
+
+          if (selectParamArr.length == 2) {
+            this.condition.id = selectParamArr[1];
+          }
+        }
+        if (this.condition.projectId) {
+          this.result = this.$post('/api/testcase/list/' + this.currentPage + "/" + this.pageSize, this.condition, response => {
+            this.total = response.data.itemCount;
+            this.tableData = response.data.listObject;
+            this.unSelection = response.data.listObject.map(s => s.id);
+
+            this.tableData.forEach(item => {
+              if (item.tags && item.tags.length > 0) {
+                item.tags = JSON.parse(item.tags);
+              }
+            })
+          });
+        }
+      },
+      open() {
+        this.$refs.searchBar.open();
+      },
+      handleSelect(selection, row) {
+        _handleSelect(this, selection, row, this.selectRows);
+        this.selectRowsCount(this.selectRows)
+      },
+      showExecResult(row) {
+        this.visible = false;
+        this.$emit('showExecResult', row);
+      },
+      filter(filters) {
+        _filter(filters, this.condition);
+        this.initTable();
+      },
+      sort(column) {
+        // 每次只对一个字段排序
+        if (this.condition.orders) {
+          this.condition.orders = [];
+        }
+        _sort(column, this.condition);
+        this.initTable();
+      },
+      handleSelectAll(selection) {
+        _handleSelectAll(this, selection, this.tableData, this.selectRows);
+        this.selectRowsCount(this.selectRows)
+      },
+      search() {
+        this.changeSelectDataRangeAll();
+        this.initTable();
+      },
+      buildPagePath(path) {
+        return path + "/" + this.currentPage + "/" + this.pageSize;
+      },
 
       handleTestCase(testCase) {
         this.$get('/api/definition/get/' + testCase.apiDefinitionId, (response) => {
@@ -365,6 +445,15 @@
         // }
       },
       handleEditBatch() {
+        if (this.currentProtocol == 'HTTP') {
+          this.valueArr.method = REQ_METHOD;
+        } else if (this.currentProtocol == 'TCP') {
+          this.valueArr.method = TCP_METHOD;
+        } else if (this.currentProtocol == 'SQL') {
+          this.valueArr.method = SQL_METHOD;
+        } else if (this.currentProtocol == 'DUBBO') {
+          this.valueArr.method = DUBBO_METHOD;
+        }
         this.$refs.batchEdit.open();
       },
       batchEdit(form) {
@@ -389,19 +478,6 @@
           this.initTable();
         });
         return;
-        // }
-        // this.$alert(this.$t('api_test.definition.request.delete_confirm') + ' ' + apiCase.name + " ？", '', {
-        //   confirmButtonText: this.$t('commons.confirm'),
-        //   callback: (action) => {
-        //     if (action === 'confirm') {
-        //       let ids = [apiCase.id];
-        //       this.$post('/api/testcase/removeToGc/', ids, () => {
-        //         this.$success(this.$t('commons.delete_success'));
-        //         this.initTable();
-        //       });
-        //     }
-        //   }
-        // });
       },
       setEnvironment(data) {
         this.environmentId = data.id;
@@ -442,9 +518,97 @@
         let rowArray = Array.from(rowSets)
         let ids = rowArray.map(s => s.id);
         return ids;
-      }
+      },
+      showCaseRef(row) {
+        let param = {};
+        Object.assign(param, row);
+        param.moduleId = undefined;
+        this.$refs.viewRef.open(param);
+      },
+      showEnvironment(row) {
+
+        let projectID = getCurrentProjectID();
+        if (this.projectId) {
+          this.$get('/api/environment/list/' + this.projectId, response => {
+            this.environments = response.data;
+            this.environments.forEach(environment => {
+              parseEnvironment(environment);
+            });
+          });
+        } else {
+          this.environment = undefined;
+        }
+        this.clickRow = row;
+        this.$refs.setEnvironment.open(row);
+      },
+      headerDragend(newWidth, oldWidth, column, event) {
+        let finalWidth = newWidth;
+        if (column.minWidth > finalWidth) {
+          finalWidth = column.minWidth;
+        }
+        column.width = finalWidth;
+        column.realWidth = finalWidth;
+      },
+      createPerformance(row, environment) {
+        /**
+         * 思路：调用后台创建性能测试的方法，把当前案例的hashTree在后台转化为jmx并文件创建性能测试。
+         * 然后跳转到修改性能测试的页面
+         *
+         * 性能测试保存地址： performance/save
+         *
+         */
+        if (!environment) {
+          this.$warning(this.$t('api_test.environment.select_environment'));
+          return;
+        }
+        let runData = [];
+        let singleLoading = true;
+        row.request = JSON.parse(row.request);
+        row.request.name = row.id;
+        row.request.useEnvironment = environment.id;
+        runData.push(row.request);
+        /*触发执行操作*/
+        let testPlan = new TestPlan();
+        let threadGroup = new ThreadGroup();
+        threadGroup.hashTree = [];
+        testPlan.hashTree = [threadGroup];
+        runData.forEach(item => {
+          threadGroup.hashTree.push(item);
+        })
+        let reqObj = {
+          id: row.id,
+          testElement: testPlan,
+          name: row.name,
+          projectId: getCurrentProjectID(),
+        };
+        let bodyFiles = getBodyUploadFiles(reqObj, runData);
+        reqObj.reportId = "run";
+
+        let url = "/api/genPerformanceTestXml";
+
+        this.$fileUpload(url, null, bodyFiles, reqObj, response => {
+          let jmxObj = {};
+          jmxObj.name = response.data.name;
+          jmxObj.xml = response.data.xml;
+          this.$store.commit('setTest', {
+            name: row.name,
+            jmx: jmxObj
+          })
+          this.$router.push({
+            path: "/performance/test/create"
+          })
+          // let performanceId = response.data;
+          // if(performanceId!=null){
+          //   this.$router.push({
+          //     path: "/performance/test/edit/"+performanceId,
+          //   })
+          // }
+        }, erro => {
+          this.$emit('runRefresh', {});
+        });
+      },
     },
-  }
+}
 </script>
 
 <style scoped>
@@ -466,7 +630,15 @@
     float: right;
     width: 300px;
     /*margin-bottom: 20px;*/
-    margin-right: 20px;
+    margin-right: 10px;
+  }
+
+  .ms-select-all >>> th:first-child {
+    margin-top: 20px;
+  }
+
+  .ms-select-all >>> th:nth-child(2) .el-icon-arrow-down {
+    top: -2px;
   }
 
 </style>

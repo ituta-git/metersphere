@@ -773,6 +773,146 @@ public class ApiTestCaseExample {
             addCriterion("num not between", value1, value2, "num");
             return (Criteria) this;
         }
+
+        public Criteria andTagsIsNull() {
+            addCriterion("tags is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsIsNotNull() {
+            addCriterion("tags is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsEqualTo(String value) {
+            addCriterion("tags =", value, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsNotEqualTo(String value) {
+            addCriterion("tags <>", value, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsGreaterThan(String value) {
+            addCriterion("tags >", value, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsGreaterThanOrEqualTo(String value) {
+            addCriterion("tags >=", value, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsLessThan(String value) {
+            addCriterion("tags <", value, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsLessThanOrEqualTo(String value) {
+            addCriterion("tags <=", value, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsLike(String value) {
+            addCriterion("tags like", value, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsNotLike(String value) {
+            addCriterion("tags not like", value, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsIn(List<String> values) {
+            addCriterion("tags in", values, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsNotIn(List<String> values) {
+            addCriterion("tags not in", values, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsBetween(String value1, String value2) {
+            addCriterion("tags between", value1, value2, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andTagsNotBetween(String value1, String value2) {
+            addCriterion("tags not between", value1, value2, "tags");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdIsNull() {
+            addCriterion("last_result_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdIsNotNull() {
+            addCriterion("last_result_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdEqualTo(String value) {
+            addCriterion("last_result_id =", value, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdNotEqualTo(String value) {
+            addCriterion("last_result_id <>", value, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdGreaterThan(String value) {
+            addCriterion("last_result_id >", value, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdGreaterThanOrEqualTo(String value) {
+            addCriterion("last_result_id >=", value, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdLessThan(String value) {
+            addCriterion("last_result_id <", value, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdLessThanOrEqualTo(String value) {
+            addCriterion("last_result_id <=", value, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdLike(String value) {
+            addCriterion("last_result_id like", value, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdNotLike(String value) {
+            addCriterion("last_result_id not like", value, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdIn(List<String> values) {
+            addCriterion("last_result_id in", values, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdNotIn(List<String> values) {
+            addCriterion("last_result_id not in", values, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdBetween(String value1, String value2) {
+            addCriterion("last_result_id between", value1, value2, "lastResultId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLastResultIdNotBetween(String value1, String value2) {
+            addCriterion("last_result_id not between", value1, value2, "lastResultId");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

@@ -24,13 +24,13 @@ public class MsIfController extends MsTestElement {
     private String operator;
     private String value;
 
+    @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, ParameterConfig config) {
-        if (!this.isEnable()) {
-            return;
-        }
         final HashTree groupTree = tree.add(ifController());
         if (CollectionUtils.isNotEmpty(hashTree)) {
             hashTree.forEach(el -> {
+                // 给所有孩子加一个父亲标志
+                el.setParent(this);
                 el.toHashTree(groupTree, el.getHashTree(), config);
             });
         }
@@ -38,11 +38,11 @@ public class MsIfController extends MsTestElement {
 
     private IfController ifController() {
         IfController ifController = new IfController();
-        ifController.setEnabled(true);
-        ifController.setName(this.getLabel());
-        ifController.setCondition(this.getCondition());
+        ifController.setEnabled(this.isEnable());
+        ifController.setName(StringUtils.isEmpty(this.getName()) ? "IfController" : this.getName());
         ifController.setProperty(TestElement.TEST_CLASS, IfController.class.getName());
         ifController.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("IfControllerPanel"));
+        ifController.setCondition(this.getCondition());
         ifController.setEvaluateAll(false);
         ifController.setUseExpression(true);
         return ifController;
@@ -55,7 +55,7 @@ public class MsIfController extends MsTestElement {
         return StringUtils.isNotBlank(variable) && StringUtils.isNotBlank(operator) && StringUtils.isNotBlank(value);
     }
 
-    public String getLabel() {
+    public String getLabelName() {
         if (isValid()) {
             String label = variable + " " + operator;
             if (StringUtils.isNotBlank(value)) {
@@ -76,13 +76,13 @@ public class MsIfController extends MsTestElement {
         }
 
         if (StringUtils.equals(operator, "is empty")) {
-            variable = "empty(" + variable + ")";
+            variable = variable + "==" + "\"\\" + this.variable + "\"" + "|| empty(" + variable + ")";
             operator = "";
             value = "";
         }
 
         if (StringUtils.equals(operator, "is not empty")) {
-            variable = "!empty(" + variable + ")";
+            variable = variable + "!=" + "\"\\" + this.variable + "\"" + "&& !empty(" + variable + ")";
             operator = "";
             value = "";
         }

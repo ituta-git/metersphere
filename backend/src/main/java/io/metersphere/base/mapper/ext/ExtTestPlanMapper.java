@@ -1,5 +1,6 @@
 package io.metersphere.base.mapper.ext;
 
+import io.metersphere.base.domain.TestPlan;
 import io.metersphere.track.dto.TestPlanDTO;
 import io.metersphere.track.dto.TestPlanDTOWithMetric;
 import io.metersphere.track.request.testcase.QueryTestPlanRequest;
@@ -26,4 +27,12 @@ public interface ExtTestPlanMapper {
     List<TestPlanDTO> selectTestPlanByRelevancy(@Param("request") QueryTestPlanRequest params);
 
     int checkIsHave(@Param("planId") String planId, @Param("workspaceIds") Set<String> workspaceIds);
+
+    String findTestProjectNameByTestPlanID(String testPlanId);
+
+    String findScheduleCreateUserById(String testPlanId);
+
+    List<String> findIdByPerformanceReportId(String reportId);
+
+    List<TestPlan> listRecent(@Param("userId") String userId, @Param("projectId") String currentProjectId);
 }

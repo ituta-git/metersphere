@@ -22,7 +22,7 @@
       <span class="custom-tree-node father" @click="handleNodeSelect(node)">
 
         <span v-if="data.isEdit" @click.stop>
-          <el-input  @blur.stop="save(node, data)" v-model="data.name" class="name-input" size="mini" ref="nameInput"/>
+          <el-input @blur.stop="save(node, data)" @keyup.enter.native.stop="$event.target.blur" v-model="data.name" class="name-input" size="mini" ref="nameInput"/>
         </span>
 
         <span v-if="!data.isEdit" class="node-icon">
@@ -132,12 +132,14 @@ export default {
     filterNode(value, data) {
       if (!value) return true;
       if (data.label) {
-        return data.label.indexOf(value) !== -1;
+        return data.label.indexOf(value.toLowerCase()) !== -1;
       }
       return false;
     },
     filter(val) {
-      this.$refs.tree.filter(val);
+      this.$nextTick(() => {
+        this.$refs.tree.filter(val);
+      });
     },
     nodeExpand(data) {
       if (data.id) {
@@ -149,8 +151,16 @@ export default {
         this.expandedNode.splice(this.expandedNode.indexOf(data.id), 1);
       }
     },
-    edit(node, data) {
+    edit(node, data, isAppend) {
       this.$set(data, 'isEdit', true);
+      this.$nextTick(() => {
+        this.$refs.nameInput.focus();
+        if (!isAppend) {
+          this.$nextTick(() => {
+            this.filter(this.filterText);
+          });
+        }
+      });
     },
     append(node, data) {
       const newChild = {
@@ -163,7 +173,7 @@ export default {
         this.$set(data, 'children', [])
       }
       data.children.push(newChild);
-      this.edit(node, newChild);
+      this.edit(node, newChild, true);
       node.expanded = true;
       this.$nextTick(() => {
         this.$refs.nameInput.focus();
@@ -209,6 +219,10 @@ export default {
     handleDragEnd(draggingNode, dropNode, dropType, ev) {
       if (dropType === "none" || dropType === undefined) {
         return;
+      }
+      if (dropNode.data.id === 'root' && dropType === 'before') {
+        this.$emit('refresh');
+        return false;
       }
       let param = this.buildParam(draggingNode, dropNode, dropType);
       let list = [];

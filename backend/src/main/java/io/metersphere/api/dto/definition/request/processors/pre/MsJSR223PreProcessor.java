@@ -27,12 +27,19 @@ public class MsJSR223PreProcessor extends MsTestElement {
     @JSONField(ordinal = 21)
     private String scriptLanguage;
 
+    @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, ParameterConfig config) {
-        if (!this.isEnable()) {
-            return;
+        final HashTree jsr223PreTree = tree.add(getJSR223PreProcessor());
+        if (CollectionUtils.isNotEmpty(hashTree)) {
+            hashTree.forEach(el -> {
+                el.toHashTree(jsr223PreTree, el.getHashTree(), config);
+            });
         }
+    }
+
+    public JSR223PreProcessor getJSR223PreProcessor() {
         JSR223PreProcessor processor = new JSR223PreProcessor();
-        processor.setEnabled(true);
+        processor.setEnabled(this.isEnable());
         if (StringUtils.isNotEmpty(this.getName())) {
             processor.setName(this.getName());
         } else {
@@ -43,13 +50,7 @@ public class MsJSR223PreProcessor extends MsTestElement {
         processor.setProperty("cacheKey", "true");
         processor.setProperty("scriptLanguage", this.getScriptLanguage());
         processor.setProperty("script", this.getScript());
-
-        final HashTree jsr223PreTree = tree.add(processor);
-        if (CollectionUtils.isNotEmpty(hashTree)) {
-            hashTree.forEach(el -> {
-                el.toHashTree(jsr223PreTree, el.getHashTree(), config);
-            });
-        }
+        return processor;
     }
 
 }

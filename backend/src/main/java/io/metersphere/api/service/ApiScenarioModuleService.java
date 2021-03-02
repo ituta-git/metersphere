@@ -46,10 +46,6 @@ public class ApiScenarioModuleService extends NodeTreeService<ApiScenarioModuleD
     @Resource
     TestPlanProjectService testPlanProjectService;
     @Resource
-    private ApiTestCaseService apiTestCaseService;
-    @Resource
-    private ApiDefinitionService apiDefinitionService;
-    @Resource
     private ProjectService projectService;
 
     public ApiScenarioModuleService() {
@@ -194,7 +190,7 @@ public class ApiScenarioModuleService extends NodeTreeService<ApiScenarioModuleD
     }
 
     public int deleteNode(List<String> nodeIds) {
-        apiAutomationService.deleteByIds(nodeIds);
+        apiAutomationService.removeToGcByIds(nodeIds);
 
         ApiScenarioModuleExample apiScenarioModuleExample = new ApiScenarioModuleExample();
         apiScenarioModuleExample.createCriteria().andIdIn(nodeIds);
@@ -213,6 +209,33 @@ public class ApiScenarioModuleService extends NodeTreeService<ApiScenarioModuleD
         ApiScenarioModule module = apiScenarioModuleMapper.selectByPrimaryKey(id);
         ApiScenarioModuleDTO dto = JSON.parseObject(JSON.toJSONString(module), ApiScenarioModuleDTO.class);
         return dto;
+    }
+
+    public ApiScenarioModule getNewModule(String name, String projectId, int level) {
+        ApiScenarioModule node = new ApiScenarioModule();
+        node.setCreateTime(System.currentTimeMillis());
+        node.setUpdateTime(System.currentTimeMillis());
+        node.setId(UUID.randomUUID().toString());
+        node.setLevel(level);
+        node.setName(name);
+        node.setProjectId(projectId);
+        return node;
+    }
+
+    public List<ApiScenarioModule> selectSameModule(ApiScenarioModule node) {
+        ApiScenarioModuleExample example = new ApiScenarioModuleExample();
+        ApiScenarioModuleExample.Criteria criteria = example.createCriteria();
+        criteria.andNameEqualTo(node.getName())
+                .andProjectIdEqualTo(node.getProjectId());
+        if (StringUtils.isNotBlank(node.getParentId())) {
+            criteria.andParentIdEqualTo(node.getParentId());
+        } else {
+            criteria.andParentIdIsNull();
+        }
+        if (StringUtils.isNotBlank(node.getId())) {
+            criteria.andIdNotEqualTo(node.getId());
+        }
+        return apiScenarioModuleMapper.selectByExample(example);
     }
 
     @Override
@@ -253,7 +276,7 @@ public class ApiScenarioModuleService extends NodeTreeService<ApiScenarioModuleD
         if (level > 8) {
             MSException.throwException(Translator.get("node_deep_limit"));
         }
-        if (rootNode.getId().equals("root")) {
+        if ("root".equals(rootNode.getId())) {
             rootPath = "";
         }
         ApiScenarioModule apiScenarioModule = new ApiScenarioModule();

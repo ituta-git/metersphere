@@ -20,6 +20,7 @@ public class MsThreadGroup extends MsTestElement {
     private String type = "ThreadGroup";
     private boolean enableCookieShare;
 
+    @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, ParameterConfig config) {
         final HashTree groupTree = tree.add(getThreadGroup());
         if ((config != null && config.isEnableCookieShare()) || enableCookieShare) {
@@ -44,11 +45,11 @@ public class MsThreadGroup extends MsTestElement {
         loopController.setName("LoopController");
         loopController.setProperty(TestElement.TEST_CLASS, LoopController.class.getName());
         loopController.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("LoopControlPanel"));
-        loopController.setEnabled(true);
+        loopController.setEnabled(this.isEnable());
         loopController.setLoops(1);
 
         ThreadGroup threadGroup = new ThreadGroup();
-        threadGroup.setEnabled(true);
+        threadGroup.setEnabled(this.isEnable());
         threadGroup.setName(this.getName());
         threadGroup.setProperty(TestElement.TEST_CLASS, ThreadGroup.class.getName());
         threadGroup.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("ThreadGroupGui"));

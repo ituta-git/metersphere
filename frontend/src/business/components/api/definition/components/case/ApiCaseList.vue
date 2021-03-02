@@ -7,47 +7,54 @@
           @getApiTest="getApiTest"
           @setEnvironment="setEnvironment"
           @addCase="addCase"
-          @batchRun="batchRun"
+          @selectAll="selectAll"
           :condition="condition"
           :priorities="priorities"
           :apiCaseList="apiCaseList"
           :is-read-only="isReadOnly"
           :project-id="projectId"
           :is-case-edit="isCaseEdit"
+          ref="header"
         />
       </template>
 
       <el-container v-loading="result.loading">
-        <el-main v-loading="batchLoading">
-          <div v-for="(item,index) in apiCaseList" :key="index">
-            <api-case-item v-loading="singleLoading && singleRunId === item.id"
+        <el-main>
+          <div v-for="(item,index) in apiCaseList" :key="item.id ? item.id : item.uuid">
+            <api-case-item v-loading="singleLoading && singleRunId === item.id || batchLoadingIds.indexOf(item.id) > -1"
                            @refresh="refresh"
                            @singleRun="singleRun"
                            @copyCase="copyCase"
                            @showExecResult="showExecResult"
+                           @batchEditCase="batchEditCase"
+                           @batchRun="batchRun"
+                           :environment="environment"
                            :is-case-edit="isCaseEdit"
                            :api="api"
-                           :api-case="item" :index="index"/>
+                           :api-case="item" :index="index" ref="apiCaseItem"/>
           </div>
         </el-main>
       </el-container>
     </ms-drawer>
 
     <!-- 执行组件 -->
-    <ms-run :debug="false" :environment="environment" :reportId="reportId" :run-data="runData"
+    <ms-run :debug="false" :environment="environment" :reportId="reportId" :run-data="runData" :env-map="envMap"
             @runRefresh="runRefresh" ref="runTest"/>
-
+    <!--批量编辑-->
+    <ms-batch-edit ref="batchEdit" @batchEdit="batchEdit" :typeArr="typeArr" :value-arr="valueArr"/>
   </div>
-
 </template>
 <script>
 
   import ApiCaseHeader from "./ApiCaseHeader";
   import ApiCaseItem from "./ApiCaseItem";
   import MsRun from "../Run";
-  import {downloadFile, getUUID, getCurrentProjectID} from "@/common/js/utils";
+  import {getCurrentProjectID, getUUID} from "@/common/js/utils";
   import MsDrawer from "../../../../common/components/MsDrawer";
-  import {PRIORITY} from "../../model/JsonData";
+  import {CASE_ORDER} from "../../model/JsonData";
+  import {API_CASE_CONFIGS} from "@/business/components/common/components/search/search-components";
+  import MsBatchEdit from "../basis/BatchEdit";
+  import {CASE_PRIORITY, REQ_METHOD, TCP_METHOD, SQL_METHOD, DUBBO_METHOD} from "../../model/JsonData";
 
   export default {
     name: 'ApiCaseList',
@@ -56,7 +63,7 @@
       MsRun,
       ApiCaseHeader,
       ApiCaseItem,
-
+      MsBatchEdit
     },
     props: {
       createCase: String,
@@ -73,19 +80,38 @@
         environment: {},
         isReadOnly: false,
         selectedEvent: Object,
-        priorities: PRIORITY,
+        priorities: CASE_ORDER,
         apiCaseList: [],
-        batchLoading: false,
+        batchLoadingIds: [],
         singleLoading: false,
         singleRunId: "",
         runData: [],
+        selectdCases: [],
         reportId: "",
         projectId: "",
         testCaseId: "",
         checkedCases: new Set(),
         visible: false,
-        condition: {},
-        api: {}
+        condition: {
+          components: API_CASE_CONFIGS
+        },
+        api: {},
+        typeArr: [
+          {id: 'priority', name: this.$t('test_track.case.priority')},
+          {id: 'method', name: this.$t('api_test.definition.api_type')},
+          {id: 'path', name: this.$t('api_test.request.path')},
+        ],
+        priorityFilters: [
+          {text: 'P0', value: 'P0'},
+          {text: 'P1', value: 'P1'},
+          {text: 'P2', value: 'P2'},
+          {text: 'P3', value: 'P3'}
+        ],
+        valueArr: {
+          priority: CASE_PRIORITY,
+          method: REQ_METHOD,
+        },
+        envMap: new Map
       }
     },
     watch: {
@@ -103,8 +129,6 @@
       this.projectId = getCurrentProjectID();
       if (this.createCase) {
         this.sysAddition();
-      } else {
-        this.getApiTest();
       }
     },
     computed: {
@@ -117,8 +141,14 @@
         this.api = api;
         // testCaseId 不为空则为用例编辑页面
         this.testCaseId = testCaseId;
-        this.getApiTest();
+        this.condition = {components: API_CASE_CONFIGS};
+        this.getApiTest(true);
         this.visible = true;
+      },
+      saveApiAndCase(api) {
+        this.visible = true;
+        this.api = api;
+        this.addCase();
       },
       setEnvironment(environment) {
         this.environment = environment;
@@ -127,11 +157,19 @@
         this.condition.projectId = this.projectId;
         this.condition.apiDefinitionId = this.api.id;
         this.$post("/api/testcase/list", this.condition, response => {
-          for (let index in response.data) {
-            let test = response.data[index];
-            test.request = JSON.parse(test.request);
-          }
           this.apiCaseList = response.data;
+          this.apiCaseList.forEach(apiCase => {
+            if (apiCase.tags && apiCase.tags.length > 0) {
+              apiCase.tags = JSON.parse(apiCase.tags);
+              this.$set(apiCase, 'selected', false);
+            }
+            if (Object.prototype.toString.call(apiCase.request).match(/\[object (\w+)\]/)[1].toLowerCase() != 'object') {
+              apiCase.request = JSON.parse(apiCase.request);
+            }
+            if (!apiCase.request.hashTree) {
+              apiCase.request.hashTree = [];
+            }
+          })
           this.addCase();
         });
       },
@@ -142,37 +180,54 @@
       },
 
       runRefresh(data) {
-        this.batchLoading = false;
+        this.batchLoadingIds = [];
         this.singleLoading = false;
         this.singleRunId = "";
-        this.$success(this.$t('schedule.event_success'));
+        if (this.$refs.header.isSelectAll) {
+          this.$refs.header.isSelectAll = false;
+        } else {
+          this.apiCaseList.forEach(item => {
+            this.$set(item, 'selected', false);
+          })
+        }
+        this.$success(this.$t('organization.integration.successful_operation'));
+        this.refresh();
+      },
+
+      refresh() {
         this.getApiTest();
         this.$emit('refresh');
       },
-
-      refresh(data) {
-        this.getApiTest();
-        this.$emit('refresh');
+      selectAll(isSelectAll) {
+        this.apiCaseList.forEach(item => {
+          this.$set(item, 'selected', isSelectAll);
+        })
       },
-
-      getApiTest() {
+      getApiTest(addCase) {
         if (this.api) {
           this.condition.projectId = this.projectId;
           if (this.isCaseEdit) {
             this.condition.id = this.testCaseId;
-          } else {
+          }
+          if(this.api){
             this.condition.apiDefinitionId = this.api.id;
           }
+
           this.result = this.$post("/api/testcase/list", this.condition, response => {
-            for (let index in response.data) {
-              let test = response.data[index];
-              test.request = JSON.parse(test.request);
-              if (!test.request.hashTree) {
-                test.request.hashTree = [];
-              }
-            }
             this.apiCaseList = response.data;
-            if (this.apiCaseList.length == 0 && !this.loaded) {
+            this.apiCaseList.forEach(apiCase => {
+              if (apiCase.tags && apiCase.tags.length > 0) {
+                apiCase.tags = JSON.parse(apiCase.tags);
+                this.$set(apiCase, 'selected', false);
+              }
+              if (Object.prototype.toString.call(apiCase.request).match(/\[object (\w+)\]/)[1].toLowerCase() != 'object') {
+                apiCase.request = JSON.parse(apiCase.request);
+              }
+              if (!apiCase.request.hashTree) {
+                apiCase.request.hashTree = [];
+              }
+            })
+            if (addCase && this.apiCaseList.length == 0 && !this.loaded) {
               this.addCase();
             }
           });
@@ -187,12 +242,15 @@
           } else {
             request = JSON.parse(this.api.request);
           }
-          let obj = {apiDefinitionId: this.api.id, name: '', priority: 'P0', active: true};
+          if (!request.hashTree) {
+            request.hashTree = [];
+          }
+          let uuid = getUUID();
+          let obj = {apiDefinitionId: this.api.id, name: '', priority: 'P0', active: true, tags: [], uuid: uuid};
           obj.request = request;
           this.apiCaseList.unshift(obj);
         }
       },
-
       copyCase(data) {
         this.apiCaseList.unshift(data);
       },
@@ -214,10 +272,14 @@
         this.singleLoading = true;
         this.singleRunId = row.id;
         row.request.name = row.id;
-        row.request.useEnvironment = this.environment.id;
-        this.runData.push(row.request);
-        /*触发执行操作*/
-        this.reportId = getUUID().substring(0, 8);
+        this.$get('/api/definition/get/' + row.request.id, response => {
+          row.request.path = response.data.path;  //  取的path是对应接口的path，因此查库以获得
+          row.request.useEnvironment = this.environment.id;
+          row.request.projectId = getCurrentProjectID();
+          this.runData.push(row.request);
+          /*触发执行操作*/
+          this.reportId = getUUID().substring(0, 8);
+        });
       },
 
       batchRun() {
@@ -225,25 +287,69 @@
           this.$warning(this.$t('api_test.environment.select_environment'));
           return;
         }
+        this.runData = [];
+        this.batchLoadingIds = [];
         if (this.apiCaseList.length > 0) {
           this.apiCaseList.forEach(item => {
-            if (item.id) {
+            if (item.selected && item.id) {
               item.request.name = item.id;
               item.request.useEnvironment = this.environment.id;
               this.runData.push(item.request);
+              this.batchLoadingIds.push(item.id);
             }
           })
           if (this.runData.length > 0) {
-            this.batchLoading = true;
             /*触发执行操作*/
             this.reportId = getUUID().substring(0, 8);
           } else {
-            this.$warning("没有可执行的用例！");
+            this.$warning("请勾选要执行的用例！");
           }
         } else {
           this.$warning("没有可执行的用例！");
         }
-      }
+      },
+      batchEditCase() {
+        if (this.apiCaseList.length > 0) {
+          this.apiCaseList.forEach(item => {
+            if (item.selected && item.id) {
+              this.selectdCases.push(item.id);
+            }
+          })
+        }
+        if (this.selectdCases.length == 0) {
+          this.$warning("请选择用例！");
+          return;
+        }
+        // //根据不同的接口，注入不同的参数
+        if (this.currentApi.protocol == 'HTTP') {
+          this.valueArr.method = REQ_METHOD;
+        } else if (this.currentApi.protocol == 'TCP') {
+          this.valueArr.method = TCP_METHOD;
+        } else if (this.currentApi.protocol == 'SQL') {
+          this.valueArr.method = SQL_METHOD;
+        } else if (this.currentApi.protocol == 'DUBBO') {
+          this.valueArr.method = DUBBO_METHOD;
+        }
+
+        this.$refs.batchEdit.open();
+      },
+      batchEdit(form) {
+        let param = {};
+        param[form.type] = form.value;
+        param.ids = this.selectdCases;
+        param.projectId = getCurrentProjectID();
+        if (this.api) {
+          param.protocol = this.api.protocol;
+        }
+        param.selectAllDate = this.isSelectAllDate;
+        param.unSelectIds = this.unSelection;
+        param = Object.assign(param, this.condition);
+        this.$post('/api/testcase/batch/editByParam', param, () => {
+          this.$success(this.$t('commons.save_success'));
+          this.selectdCases = [];
+          this.getApiTest();
+        });
+      },
     }
   }
 </script>

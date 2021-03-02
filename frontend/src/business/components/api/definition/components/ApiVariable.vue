@@ -1,17 +1,20 @@
 <template>
-  <div style="min-width: 1200px;margin-bottom: 20px">
+  <div style="margin-bottom: 20px">
     <span class="kv-description" v-if="description">
       {{ description }}
     </span>
 
-    <div class="kv-row" v-for="(item, index) in parameters" :key="index">
+    <div class="item kv-row" v-for="(item, index) in parameters" :key="index">
       <el-row type="flex" :gutter="20" justify="space-between" align="middle">
         <el-col class="kv-checkbox" v-if="isShowEnable">
           <input type="checkbox" v-if="!isDisable(index)" v-model="item.enable"
                  :disabled="isReadOnly"/>
         </el-col>
+        <span style="margin-left: 10px" v-else></span>
+        <i class="el-icon-top" style="cursor:pointer" @click="moveTop(index)"/>
+        <i class="el-icon-bottom" style="cursor:pointer;" @click="moveBottom(index)"/>
 
-        <el-col>
+        <el-col class="item">
           <el-input v-if="!suggestions" :disabled="isReadOnly" v-model="item.name" size="small" maxlength="200"
                     @change="change" :placeholder="keyText" show-word-limit>
             <template v-slot:prepend>
@@ -28,13 +31,13 @@
 
         </el-col>
 
-        <el-col class="kv-select">
+        <el-col class="item kv-select">
           <el-select v-model="item.required" size="small">
             <el-option v-for="req in requireds" :key="req.id" :label="req.name" :value="req.id"/>
           </el-select>
         </el-col>
 
-        <el-col v-if="item.type !== 'file'">
+        <el-col class="item" v-if="item.type !== 'file'">
           <el-autocomplete
             :disabled="isReadOnly"
             size="small"
@@ -49,7 +52,7 @@
           </el-autocomplete>
         </el-col>
 
-        <el-col>
+        <el-col class="item">
           <el-input v-model="item.description" size="small" maxlength="200"
                     :placeholder="$t('commons.description')" show-word-limit>
           </el-input>
@@ -59,17 +62,17 @@
 
         </el-col>
 
-        <el-col v-if="item.type === 'file'">
+        <el-col v-if="item.type === 'file'" class="item">
           <ms-api-body-file-upload :parameter="item"/>
         </el-col>
 
-        <el-col v-if="type === 'body'" class="kv-select">
+        <el-col v-if="type === 'body'" class="item kv-select">
           <el-input :disabled="isReadOnly" v-model="item.contentType" size="small"
                     @change="change" :placeholder="$t('api_test.request.content_type')" show-word-limit>
           </el-input>
         </el-col>
 
-        <el-col class="kv-delete">
+        <el-col class="item kv-delete">
           <el-button size="mini" class="el-icon-delete-solid" circle @click="remove(index)"
                      :disabled="isDisable(index) || isReadOnly"/>
         </el-col>
@@ -89,6 +92,7 @@
   import MsApiVariableAdvance from "./ApiVariableAdvance";
   import MsApiBodyFileUpload from "./body/ApiBodyFileUpload";
   import {REQUIRED} from "../model/JsonData";
+  import Vue from 'vue';
 
   export default {
     name: "MsApiVariable",
@@ -118,7 +122,7 @@
     data() {
       return {
         currentItem: null,
-        requireds: REQUIRED
+        requireds: REQUIRED,
       }
     },
     computed: {
@@ -130,6 +134,25 @@
       }
     },
     methods: {
+      moveBottom(index) {
+        if (this.parameters.length < 2 || index === this.parameters.length - 2) {
+          return;
+        }
+        let thisRow = this.parameters[index];
+        let nextRow = this.parameters[index + 1];
+        Vue.set(this.parameters, index + 1, thisRow);
+        Vue.set(this.parameters, index, nextRow)
+      },
+      moveTop(index) {
+        if (index === 0) {
+          return;
+        }
+        let thisRow = this.parameters[index];
+        let lastRow = this.parameters[index - 1];
+        Vue.set(this.parameters, index - 1, thisRow);
+        Vue.set(this.parameters, index, lastRow)
+
+      },
       remove: function (index) {
         // 移除整行输入控件及内容
         this.parameters.splice(index, 1);
@@ -196,7 +219,7 @@
         } else {
           item.contentType = 'text/plain';
         }
-      }
+      },
     },
     created() {
       if (this.parameters.length === 0 || this.parameters[this.parameters.length - 1].name) {

@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.Map;
 
 @Setter
 @Getter
@@ -18,6 +19,8 @@ public class SaveApiScenarioRequest {
     private String userId;
 
     private String apiScenarioModuleId;
+
+    private String environmentId;
 
     private String modulePath;
 
@@ -40,4 +43,15 @@ public class SaveApiScenarioRequest {
     private MsTestElement scenarioDefinition;
 
     List<String> bodyUploadIds;
+
+    private List<String> scenarioIds;
+
+    private boolean isSelectAllDate;
+
+    private Map<String, List<String>> filters;
+
+    private List<String> moduleIds;
+
+    private List<String> unSelectIds;
+
 }
